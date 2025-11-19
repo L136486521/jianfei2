@@ -22,6 +22,33 @@ import platform
 # 检查当前平台
 IS_ANDROID = platform.system() == "Linux" and "ANDROID_ARGUMENT" in os.environ
 
+def format_date(date_obj):
+    """将日期格式化为 YYYY/MM/DD 格式"""
+    if isinstance(date_obj, str):
+        # 如果是字符串，尝试转换
+        try:
+            # 处理可能的多种格式
+            for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%Y%m%d']:
+                try:
+                    date_obj = datetime.strptime(date_obj, fmt).date()
+                    break
+                except ValueError:
+                    continue
+        except:
+            return date_obj
+    return date_obj.strftime('%Y/%m/%d')
+
+def parse_date(date_str):
+    """解析 YYYY/MM/DD 格式的日期字符串"""
+    try:
+        return datetime.strptime(date_str, '%Y/%m/%d').date()
+    except ValueError:
+        # 如果解析失败，尝试其他格式
+        try:
+            return datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return date.today()
+
 class SimpleChart(Widget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -448,7 +475,7 @@ class WeightDatabase:
             
         try:
             cursor = conn.cursor()
-            current_date = date.today().isoformat()
+            current_date = format_date(date.today())
             
             cursor.execute('''
                 SELECT food, thoughts FROM diary_entries WHERE date = ?
@@ -486,7 +513,15 @@ class WeightDatabase:
             
             records = cursor.fetchall()
             conn.close()
-            return records
+            
+            # 转换日期格式
+            formatted_records = []
+            for record in records:
+                date_str, weight_type, weight = record
+                formatted_date = format_date(parse_date(date_str))
+                formatted_records.append((formatted_date, weight_type, weight))
+            
+            return formatted_records
         except Exception as e:
             Logger.error(f"Database: 获取最近记录失败 - {str(e)}")
             try:
@@ -511,7 +546,15 @@ class WeightDatabase:
             
             records = cursor.fetchall()
             conn.close()
-            return records
+            
+            # 转换日期格式
+            formatted_records = []
+            for record in records:
+                date_str, weight_type, weight = record
+                formatted_date = format_date(parse_date(date_str))
+                formatted_records.append((formatted_date, weight_type, weight))
+            
+            return formatted_records
         except Exception as e:
             Logger.error(f"Database: 获取所有记录失败 - {str(e)}")
             try:
@@ -537,7 +580,15 @@ class WeightDatabase:
             
             entries = cursor.fetchall()
             conn.close()
-            return entries
+            
+            # 转换日期格式
+            formatted_entries = []
+            for entry in entries:
+                date_str, food, thoughts = entry
+                formatted_date = format_date(parse_date(date_str))
+                formatted_entries.append((formatted_date, food, thoughts))
+            
+            return formatted_entries
         except Exception as e:
             Logger.error(f"Database: 获取日记记录失败 - {str(e)}")
             try:
@@ -562,7 +613,15 @@ class WeightDatabase:
             
             entries = cursor.fetchall()
             conn.close()
-            return entries
+            
+            # 转换日期格式
+            formatted_entries = []
+            for entry in entries:
+                date_str, food, thoughts = entry
+                formatted_date = format_date(parse_date(date_str))
+                formatted_entries.append((formatted_date, food, thoughts))
+            
+            return formatted_entries
         except Exception as e:
             Logger.error(f"Database: 获取所有日记失败 - {str(e)}")
             try:
@@ -665,10 +724,10 @@ class WeightDatabase:
                 # 优先使用早晨体重，如果没有则使用晚上体重
                 if morning_weight is not None:
                     morning_weights.append(morning_weight)
-                    valid_labels.append(date_str)
+                    valid_labels.append(format_date(parse_date(date_str)))
                 elif evening_weight is not None:
                     morning_weights.append(evening_weight)
-                    valid_labels.append(date_str)
+                    valid_labels.append(format_date(parse_date(date_str)))
                 
                 # 添加晚上体重
                 if evening_weight is not None:
@@ -699,22 +758,26 @@ class WeightDatabase:
             cursor.execute('DELETE FROM weight_records')
             cursor.execute('DELETE FROM diary_entries')
             
-            # 导入体重记录 - 将中文时间类型转换为英文
+            # 导入体重记录 - 将中文时间类型转换为英文，并转换日期格式
             for record in data.get('weight_records', []):
                 date_str, weight_type_cn, weight = record
+                # 转换日期格式
+                formatted_date = format_date(parse_date(date_str))
                 # 将中文时间类型转换为英文
                 weight_type_en = 'morning' if weight_type_cn == '早晨' else 'evening'
                 cursor.execute('''
                     INSERT INTO weight_records (date, weight_type, weight)
                     VALUES (?, ?, ?)
-                ''', (date_str, weight_type_en, weight))
+                ''', (formatted_date, weight_type_en, weight))
             
-            # 导入日记记录
+            # 导入日记记录 - 转换日期格式
             for entry in data.get('diary_entries', []):
+                date_str, food, thoughts = entry
+                formatted_date = format_date(parse_date(date_str))
                 cursor.execute('''
                     INSERT INTO diary_entries (date, food, thoughts)
                     VALUES (?, ?, ?)
-                ''', (entry[0], entry[1], entry[2]))
+                ''', (formatted_date, food, thoughts))
             
             conn.commit()
             conn.close()
@@ -1135,7 +1198,7 @@ class WeightTrackerApp(App):
         try:
             weight = float(weight_text)
             if 20 <= weight <= 400:
-                current_date = date.today().isoformat()
+                current_date = format_date(date.today())
                 weight_type = 'morning' if self.time_spinner.text == '早晨' else 'evening'
                 
                 if self.db.add_weight_record(current_date, weight_type, weight):
@@ -1156,10 +1219,9 @@ class WeightTrackerApp(App):
         display_text = "最近体重记录：\n\n"
         
         for record in records:
-            date_str = record[0]
-            weight_type = "早晨" if record[1] == "morning" else "晚上"
-            weight = record[2]
-            display_text += f"{date_str} {weight_type}: {weight}斤\n"
+            date_str, weight_type, weight = record
+            weight_type_display = "早晨" if weight_type == "morning" else "晚上"
+            display_text += f"{date_str} {weight_type_display}: {weight}斤\n"
         
         self.records_label.text = display_text
     
@@ -1229,7 +1291,7 @@ class WeightTrackerApp(App):
     def save_diary(self, instance):
         food_text = self.food_input.text
         thoughts_text = self.thoughts_input.text
-        current_date = date.today().isoformat()
+        current_date = format_date(date.today())
         
         if self.db.add_diary_entry(current_date, food_text, thoughts_text):
             self.update_diary_display()
@@ -1242,9 +1304,9 @@ class WeightTrackerApp(App):
         diary_text = "最近日记记录：\n\n"
         
         for entry in entries:
-            date_str = entry[0]
-            food = entry[1] or "无记录"
-            thoughts = entry[2] or "无记录"
+            date_str, food, thoughts = entry
+            food = food or "无记录"
+            thoughts = thoughts or "无记录"
             diary_text += f"日期: {date_str}\n"
             diary_text += f"饮食: {food}\n"
             diary_text += f"心得: {thoughts}\n"
@@ -1284,7 +1346,7 @@ class WeightTrackerApp(App):
             # 显示详细的导出信息
             message = f"数据已导出到Excel文件:\n{export_path}\n\n"
             message += f"文件大小: {os.path.getsize(export_path)} 字节\n"
-            message += f"导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            message += f"导出时间: {datetime.now().strftime('%Y/%m/%d %H:%M:%S')}\n\n"
             message += "Excel文件包含两个工作表:\n"
             message += "1. 体重记录 - 包含所有体重数据\n"
             message += "2. 减肥日记 - 包含所有日记数据"
@@ -1310,7 +1372,7 @@ class WeightTrackerApp(App):
             mod_time = datetime.fromtimestamp(os.path.getmtime(export_path))
             message += f"文件状态: 已存在\n"
             message += f"文件大小: {file_size} 字节\n"
-            message += f"修改时间: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            message += f"修改时间: {mod_time.strftime('%Y/%m/%d %H:%M:%S')}\n\n"
         else:
             message += f"文件状态: 尚未导出\n\n"
         
