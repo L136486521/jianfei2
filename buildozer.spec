@@ -20,7 +20,13 @@ presplash.filename = %(source.dir)s/presplash.png
 orientation = portrait
 fullscreen = 0
 
-# 修正的依赖配置
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,pandas,openpyxl,numpy,android,sqlite3,datetime,json,platform,os
+# 依赖配置 - 简化版本
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,android
 
+# 构建模式
 build_type = debug
+
+[buildozer]
+log_level = 2
+build_dir = .buildozer
+bin_dir = ./bin
