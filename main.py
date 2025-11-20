@@ -25,9 +25,7 @@ IS_ANDROID = platform.system() == "Linux" and "ANDROID_ARGUMENT" in os.environ
 def format_date(date_obj):
     """将日期格式化为 YYYY/MM/DD 格式"""
     if isinstance(date_obj, str):
-        # 如果是字符串，尝试转换
         try:
-            # 处理可能的多种格式
             for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%Y%m%d']:
                 try:
                     date_obj = datetime.strptime(date_obj, fmt).date()
@@ -43,7 +41,6 @@ def parse_date(date_str):
     try:
         return datetime.strptime(date_str, '%Y/%m/%d').date()
     except ValueError:
-        # 如果解析失败，尝试其他格式
         try:
             return datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
@@ -63,16 +60,6 @@ class SimpleChart(Widget):
         self.line_color = (0.2, 0.6, 0.8, 1)
         self.grid_color = (0.8, 0.8, 0.8, 0.5)
         self.text_color = (0, 0, 0, 1)
-        self.bind(size=self._update_scroll_size)
-        
-    def _update_scroll_size(self, *args):
-        """更新滚动区域大小"""
-        if hasattr(self, 'parent_scroll') and self.parent_scroll:
-            # 设置最小尺寸以确保可以滚动
-            min_width = max(self.width, 800)
-            min_height = max(self.height, 600)
-            self.size_hint = (None, None)
-            self.size = (min_width, min_height)
         
     def set_data(self, data_points, labels=None):
         """设置图表数据"""
@@ -83,13 +70,11 @@ class SimpleChart(Widget):
             self.min_value = min(data_points)
             self.max_value = max(data_points)
             
-            # 添加一些边距
             value_range = self.max_value - self.min_value
             if value_range > 0:
                 self.min_value -= value_range * 0.1
                 self.max_value += value_range * 0.1
             else:
-                # 如果所有值都相同，设置一个合理的范围
                 self.min_value -= 10
                 self.max_value += 10
         else:
@@ -103,12 +88,10 @@ class SimpleChart(Widget):
         self.canvas.clear()
         
         with self.canvas:
-            # 绘制背景
             Color(*self.background_color)
             Rectangle(pos=self.pos, size=self.size)
             
             if not self.data_points:
-                # 没有数据时显示提示
                 Color(*self.text_color)
                 Rectangle(
                     pos=(self.center_x - 100, self.center_y - 15),
@@ -116,15 +99,11 @@ class SimpleChart(Widget):
                 )
                 return
             
-            # 绘制网格和坐标轴
             self.draw_grid_and_axes()
-            
-            # 绘制数据线
             self.draw_data_line()
     
     def draw_grid_and_axes(self):
         """绘制网格和坐标轴"""
-        # 计算边距
         margin_left = dp(80)
         margin_bottom = dp(60)
         margin_top = dp(50)
@@ -133,10 +112,8 @@ class SimpleChart(Widget):
         chart_width = self.width - margin_left - margin_right
         chart_height = self.height - margin_bottom - margin_top
         
-        # 绘制网格线
         Color(*self.grid_color)
         
-        # 水平网格线
         num_h_lines = 5
         for i in range(num_h_lines + 1):
             y = margin_bottom + (chart_height / num_h_lines) * i
@@ -145,19 +122,15 @@ class SimpleChart(Widget):
                 width=1
             )
             
-            # 绘制Y轴刻度值
-            value = self.max_value - (self.max_value - self.min_value) * (i / num_h_lines)
             Color(*self.text_color)
             Rectangle(
                 pos=(margin_left - dp(50), y - dp(10)),
                 size=(dp(45), dp(20))
             )
-            # 这里应该使用Label来显示文本，但为了简化，我们使用矩形表示
             
-        # 垂直网格线 (只显示部分标签避免拥挤)
         num_points = len(self.data_points)
         if num_points > 0:
-            step = max(1, num_points // 5)  # 最多显示5个标签
+            step = max(1, num_points // 5)
             
             for i in range(0, num_points, step):
                 if i < len(self.labels):
@@ -167,15 +140,12 @@ class SimpleChart(Widget):
                         width=1
                     )
                     
-                    # 绘制X轴标签
                     Color(*self.text_color)
                     Rectangle(
                         pos=(x - dp(20), margin_bottom - dp(30)),
                         size=(dp(40), dp(20))
                     )
-                    # 这里应该使用Label来显示文本，但为了简化，我们使用矩形表示
         
-        # 绘制坐标轴线
         Color(0, 0, 0, 1)
         Line(
             points=[margin_left, margin_bottom, margin_left, margin_bottom + chart_height],
@@ -186,19 +156,15 @@ class SimpleChart(Widget):
             width=2
         )
         
-        # 绘制坐标轴标签
         Color(*self.text_color)
-        # Y轴标签
         Rectangle(
             pos=(dp(10), self.center_y - dp(50)),
             size=(dp(100), dp(20))
         )
-        # X轴标签
         Rectangle(
             pos=(self.center_x - dp(25), dp(10)),
             size=(dp(50), dp(20))
         )
-        # 图表标题
         Rectangle(
             pos=(self.center_x - dp(50), self.height - dp(30)),
             size=(dp(100), dp(20))
@@ -209,7 +175,6 @@ class SimpleChart(Widget):
         if not self.data_points:
             return
             
-        # 计算边距
         margin_left = dp(80)
         margin_bottom = dp(60)
         margin_top = dp(50)
@@ -218,39 +183,32 @@ class SimpleChart(Widget):
         chart_width = self.width - margin_left - margin_right
         chart_height = self.height - margin_bottom - margin_top
         
-        # 计算数据点位置
         points = []
         num_points = len(self.data_points)
         
         for i, value in enumerate(self.data_points):
-            # 修复：避免除零错误
-            if num_points > 1:
-                x = margin_left + (chart_width / (num_points - 1)) * i
-            else:
-                x = margin_left + chart_width * 0.5  # 只有一个点时放在中间
-            
-            # 修复：避免除零错误
-            value_range = self.max_value - self.min_value
-            if value_range > 0:
-                y = margin_bottom + ((value - self.min_value) / value_range) * chart_height
-            else:
-                y = margin_bottom + chart_height * 0.5  # 如果值范围为零，放在中间
-            
-            points.extend([x, y])
-        
-        # 绘制数据线
-        Color(*self.line_color)
-        Line(points=points, width=2)
-        
-        # 绘制数据点
-        for i, value in enumerate(self.data_points):
-            # 修复：避免除零错误
             if num_points > 1:
                 x = margin_left + (chart_width / (num_points - 1)) * i
             else:
                 x = margin_left + chart_width * 0.5
             
-            # 修复：避免除零错误
+            value_range = self.max_value - self.min_value
+            if value_range > 0:
+                y = margin_bottom + ((value - self.min_value) / value_range) * chart_height
+            else:
+                y = margin_bottom + chart_height * 0.5
+            
+            points.extend([x, y])
+        
+        Color(*self.line_color)
+        Line(points=points, width=2)
+        
+        for i, value in enumerate(self.data_points):
+            if num_points > 1:
+                x = margin_left + (chart_width / (num_points - 1)) * i
+            else:
+                x = margin_left + chart_width * 0.5
+            
             value_range = self.max_value - self.min_value
             if value_range > 0:
                 y = margin_bottom + ((value - self.min_value) / value_range) * chart_height
@@ -261,32 +219,78 @@ class SimpleChart(Widget):
             Rectangle(pos=(x-3, y-3), size=(6, 6))
     
     def on_size(self, *args):
-        """当组件大小改变时重绘图表"""
         self.draw_chart()
 
 class WeightDatabase:
-    def __init__(self, db_path=None):
-        # 在Android上使用应用数据目录
-        if IS_ANDROID:
-            from kivy.app import App
-            app = App.get_running_app()
-            if app:
-                self.db_path = os.path.join(app.user_data_dir, "weight_data.db")
-            else:
-                # 如果应用还没运行，使用默认路径
-                self.db_path = "weight_data.db"
-        else:
-            self.db_path = db_path or "weight_data.db"
-        
+    def __init__(self, app_instance=None):
+        self.app = app_instance
+        self.db_path = self.get_db_path()
         Logger.info(f"Database: 数据库路径 - {self.db_path}")
         self.init_database()
     
+    def get_db_path(self):
+        """获取数据库路径，优先使用应用数据目录"""
+        if IS_ANDROID:
+            # 在Android上使用应用数据目录
+            try:
+                from android.storage import app_storage_path
+                base_dir = app_storage_path()
+            except:
+                # 如果上面的方法失败，使用kivy的应用数据目录
+                try:
+                    from kivy.app import App
+                    app = App.get_running_app()
+                    if app:
+                        base_dir = app.user_data_dir
+                    else:
+                        base_dir = "/data/data/org.test.weighttracker/files"
+                except:
+                    base_dir = "/data/data/org.test.weighttracker/files"
+            
+            # 确保目录存在
+            if not os.path.exists(base_dir):
+                try:
+                    os.makedirs(base_dir)
+                except:
+                    base_dir = "/data/data/org.test.weighttracker/files"
+            
+            db_path = os.path.join(base_dir, "weight_data.db")
+        else:
+            # 在PC上使用当前目录
+            db_path = "weight_data.db"
+        
+        return db_path
+    
+    def get_export_path(self, filename):
+        """获取导出文件路径"""
+        if IS_ANDROID:
+            # 在Android上，尝试使用下载目录或文档目录
+            try:
+                from android.storage import primary_external_storage_path
+                base_dir = primary_external_storage_path()
+                download_dir = os.path.join(base_dir, "Download")
+                if os.path.exists(download_dir):
+                    return os.path.join(download_dir, filename)
+                else:
+                    # 如果Download目录不存在，使用应用数据目录
+                    return os.path.join(self.get_db_path().rsplit('/', 1)[0], filename)
+            except:
+                # 如果上面的方法失败，使用应用数据目录
+                return os.path.join(self.get_db_path().rsplit('/', 1)[0], filename)
+        else:
+            # 在PC上使用当前目录
+            return filename
+    
     def init_database(self):
         try:
+            # 确保目录存在
+            db_dir = os.path.dirname(self.db_path)
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(db_dir)
+            
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # 创建体重记录表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS weight_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -297,7 +301,6 @@ class WeightDatabase:
                 )
             ''')
             
-            # 创建日记表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS diary_entries (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -313,9 +316,8 @@ class WeightDatabase:
             Logger.info("Database: 数据库初始化成功")
         except Exception as e:
             Logger.error(f"Database: 数据库初始化失败 - {str(e)}")
-            # 尝试重新创建数据库连接
+            # 尝试使用内存数据库作为后备
             try:
-                # 如果连接失败，尝试使用内存数据库
                 self.db_path = ":memory:"
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
@@ -347,38 +349,9 @@ class WeightDatabase:
                 Logger.error(f"Database: 内存数据库也失败 - {str(e2)}")
     
     def get_connection(self):
-        """获取数据库连接，确保表存在"""
+        """获取数据库连接"""
         try:
             conn = sqlite3.connect(self.db_path)
-            # 确保表存在
-            cursor = conn.cursor()
-            
-            # 检查表是否存在，如果不存在则创建
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='weight_records'")
-            if not cursor.fetchone():
-                cursor.execute('''
-                    CREATE TABLE weight_records (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        date TEXT NOT NULL,
-                        weight_type TEXT NOT NULL,
-                        weight REAL NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-            
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='diary_entries'")
-            if not cursor.fetchone():
-                cursor.execute('''
-                    CREATE TABLE diary_entries (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        date TEXT NOT NULL,
-                        food TEXT,
-                        thoughts TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-            
-            conn.commit()
             return conn
         except Exception as e:
             Logger.error(f"Database: 获取连接失败 - {str(e)}")
@@ -392,7 +365,6 @@ class WeightDatabase:
         try:
             cursor = conn.cursor()
             
-            # 检查是否已经存在当天的同类型记录
             cursor.execute('''
                 SELECT id FROM weight_records 
                 WHERE date = ? AND weight_type = ?
@@ -401,14 +373,12 @@ class WeightDatabase:
             existing_record = cursor.fetchone()
             
             if existing_record:
-                # 更新现有记录
                 cursor.execute('''
                     UPDATE weight_records 
                     SET weight = ?, created_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ''', (weight, existing_record[0]))
             else:
-                # 插入新记录
                 cursor.execute('''
                     INSERT INTO weight_records (date, weight_type, weight)
                     VALUES (?, ?, ?)
@@ -434,7 +404,6 @@ class WeightDatabase:
         try:
             cursor = conn.cursor()
             
-            # 检查是否已经存在当天的日记
             cursor.execute('''
                 SELECT id FROM diary_entries WHERE date = ?
             ''', (date_str,))
@@ -442,14 +411,12 @@ class WeightDatabase:
             existing_entry = cursor.fetchone()
             
             if existing_entry:
-                # 更新现有日记
                 cursor.execute('''
                     UPDATE diary_entries 
                     SET food = ?, thoughts = ?, created_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ''', (food, thoughts, existing_entry[0]))
             else:
-                # 插入新日记
                 cursor.execute('''
                     INSERT INTO diary_entries (date, food, thoughts)
                     VALUES (?, ?, ?)
@@ -514,7 +481,6 @@ class WeightDatabase:
             records = cursor.fetchall()
             conn.close()
             
-            # 转换日期格式
             formatted_records = []
             for record in records:
                 date_str, weight_type, weight = record
@@ -547,7 +513,6 @@ class WeightDatabase:
             records = cursor.fetchall()
             conn.close()
             
-            # 转换日期格式
             formatted_records = []
             for record in records:
                 date_str, weight_type, weight = record
@@ -581,7 +546,6 @@ class WeightDatabase:
             entries = cursor.fetchall()
             conn.close()
             
-            # 转换日期格式
             formatted_entries = []
             for entry in entries:
                 date_str, food, thoughts = entry
@@ -614,7 +578,6 @@ class WeightDatabase:
             entries = cursor.fetchall()
             conn.close()
             
-            # 转换日期格式
             formatted_entries = []
             for entry in entries:
                 date_str, food, thoughts = entry
@@ -689,7 +652,6 @@ class WeightDatabase:
         try:
             cursor = conn.cursor()
             
-            # 获取最近指定天数的记录，按日期排序
             cursor.execute('''
                 SELECT date, weight_type, weight 
                 FROM weight_records 
@@ -699,7 +661,6 @@ class WeightDatabase:
             all_records = cursor.fetchall()
             conn.close()
             
-            # 处理数据，将同一天的早晨和晚上体重合并
             chart_data = {}
             labels = []
             
@@ -712,16 +673,14 @@ class WeightDatabase:
                 
                 chart_data[date_str][weight_type] = weight
             
-            # 提取早晨体重数据，如果没有早晨体重则使用晚上体重
             morning_weights = []
             evening_weights = []
             valid_labels = []
             
-            for date_str in labels[-days:]:  # 只取最近days天的数据
+            for date_str in labels[-days:]:
                 morning_weight = chart_data[date_str]['morning']
                 evening_weight = chart_data[date_str]['evening']
                 
-                # 优先使用早晨体重，如果没有则使用晚上体重
                 if morning_weight is not None:
                     morning_weights.append(morning_weight)
                     valid_labels.append(format_date(parse_date(date_str)))
@@ -729,7 +688,6 @@ class WeightDatabase:
                     morning_weights.append(evening_weight)
                     valid_labels.append(format_date(parse_date(date_str)))
                 
-                # 添加晚上体重
                 if evening_weight is not None:
                     evening_weights.append(evening_weight)
             
@@ -754,23 +712,18 @@ class WeightDatabase:
         try:
             cursor = conn.cursor()
             
-            # 清空现有数据
             cursor.execute('DELETE FROM weight_records')
             cursor.execute('DELETE FROM diary_entries')
             
-            # 导入体重记录 - 将中文时间类型转换为英文，并转换日期格式
             for record in data.get('weight_records', []):
                 date_str, weight_type_cn, weight = record
-                # 转换日期格式
                 formatted_date = format_date(parse_date(date_str))
-                # 将中文时间类型转换为英文
                 weight_type_en = 'morning' if weight_type_cn == '早晨' else 'evening'
                 cursor.execute('''
                     INSERT INTO weight_records (date, weight_type, weight)
                     VALUES (?, ?, ?)
                 ''', (formatted_date, weight_type_en, weight))
             
-            # 导入日记记录 - 转换日期格式
             for entry in data.get('diary_entries', []):
                 date_str, food, thoughts = entry
                 formatted_date = format_date(parse_date(date_str))
@@ -792,19 +745,17 @@ class WeightDatabase:
             return False
 
 class WeightTrackerApp(App):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # 不在初始化时创建数据库，在build方法中创建
-    
     def build(self):
         try:
-            # 创建数据库实例
-            self.db = WeightDatabase()
+            # 设置应用标题
+            self.title = "体重追踪器"
             
-            # 创建主界面 - 标签放在底部，设置标签字体大小
+            # 创建数据库实例，传入app实例
+            self.db = WeightDatabase(self)
+            
+            # 创建主界面
             main_layout = TabbedPanel(tab_pos='bottom_mid')
             main_layout.do_default_tab = False
-            # 设置标签页字体大小
             main_layout.font_size = '32sp'
             
             # 记录体重标签页
@@ -836,20 +787,37 @@ class WeightTrackerApp(App):
             return main_layout
         except Exception as e:
             Logger.error(f"App: 应用初始化失败 - {str(e)}")
-            # 返回一个简单的错误界面
+            # 返回错误界面
             layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
             layout.add_widget(Label(text='应用启动失败', font_size=52))
             layout.add_widget(Label(text=f'错误: {str(e)}', font_size=44))
+            
+            # 添加重启按钮
+            restart_btn = Button(
+                text='重启应用',
+                font_size=44,
+                background_color=(0.8, 0.2, 0.2, 1)
+            )
+            restart_btn.bind(on_press=self.restart_app)
+            layout.add_widget(restart_btn)
+            
             return layout
+    
+    def restart_app(self, instance):
+        """重启应用"""
+        try:
+            from kivy.app import App
+            App.get_running_app().stop()
+            WeightTrackerApp().run()
+        except:
+            pass
     
     def create_record_tab(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # 标题
         title = Label(text='记录体重', font_size=52, size_hint_y=0.1)
         layout.add_widget(title)
         
-        # 选择时间 - 单独一行
         time_layout = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=15)
         time_layout.add_widget(Label(text='选择时间:', font_size=44))
         
@@ -857,12 +825,11 @@ class WeightTrackerApp(App):
             text='早晨',
             values=('早晨', '晚上'),
             font_size=44,
-            size_hint_x=0.7  # 设置时间选择器的宽度
+            size_hint_x=0.7
         )
         time_layout.add_widget(self.time_spinner)
         layout.add_widget(time_layout)
         
-        # 输入体重 - 单独一行
         weight_layout = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=15)
         weight_layout.add_widget(Label(text='体重(斤):', font_size=44))
         
@@ -871,12 +838,11 @@ class WeightTrackerApp(App):
             input_filter='float',
             font_size=44,
             hint_text='输入20-400之间的数字',
-            size_hint_x=0.7  # 设置输入框与时间选择器相同的宽度
+            size_hint_x=0.7
         )
         weight_layout.add_widget(self.weight_input)
         layout.add_widget(weight_layout)
         
-        # 按钮
         button_layout = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=15)
         
         record_btn = Button(
@@ -889,7 +855,6 @@ class WeightTrackerApp(App):
         
         layout.add_widget(button_layout)
         
-        # 最近记录
         self.records_label = Label(
             text='最近体重记录：\n\n',
             font_size=40,
@@ -904,7 +869,6 @@ class WeightTrackerApp(App):
         scroll.add_widget(self.records_label)
         layout.add_widget(scroll)
         
-        # 初始化显示
         Clock.schedule_once(self.update_records_display, 0.1)
         
         return layout
@@ -912,11 +876,9 @@ class WeightTrackerApp(App):
     def create_stats_tab(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # 标题
         title = Label(text='体重统计', font_size=52, size_hint_y=0.1)
         layout.add_widget(title)
         
-        # 统计信息
         stats_layout = BoxLayout(orientation='vertical', spacing=20, padding=20)
         
         self.initial_weight = Label(
@@ -955,7 +917,6 @@ class WeightTrackerApp(App):
         
         layout.add_widget(stats_layout)
         
-        # 刷新按钮
         refresh_btn = Button(
             text='刷新统计',
             font_size=44,
@@ -965,7 +926,6 @@ class WeightTrackerApp(App):
         refresh_btn.bind(on_press=self.update_statistics)
         layout.add_widget(refresh_btn)
         
-        # 初始化显示
         Clock.schedule_once(self.update_statistics, 0.1)
         
         return layout
@@ -973,11 +933,9 @@ class WeightTrackerApp(App):
     def create_chart_tab(self):
         layout = BoxLayout(orientation='vertical', padding=15, spacing=15)
         
-        # 标题
         title = Label(text='体重趋势图', font_size=52, size_hint_y=0.1)
         layout.add_widget(title)
         
-        # 图表类型选择
         chart_type_layout = BoxLayout(orientation='horizontal', size_hint_y=0.1, spacing=15)
         chart_type_layout.add_widget(Label(text='图表类型:', font_size=42))
         
@@ -989,7 +947,6 @@ class WeightTrackerApp(App):
         self.chart_type_spinner.bind(text=self.on_chart_type_change)
         chart_type_layout.add_widget(self.chart_type_spinner)
         
-        # 时间范围选择
         chart_type_layout.add_widget(Label(text='时间范围:', font_size=42))
         
         self.chart_range_spinner = Spinner(
@@ -1002,7 +959,6 @@ class WeightTrackerApp(App):
         
         layout.add_widget(chart_type_layout)
         
-        # 图表容器 - 使用ScrollView包装图表
         chart_scroll = ScrollView(size_hint_y=0.7, do_scroll_x=True, do_scroll_y=True)
         chart_container = BoxLayout(orientation='vertical', size_hint=(None, None))
         chart_container.bind(minimum_height=chart_container.setter('height'))
@@ -1010,14 +966,12 @@ class WeightTrackerApp(App):
         
         self.chart = SimpleChart()
         self.chart.size_hint = (None, None)
-        self.chart.size = (800, 600)  # 设置固定大小以便滚动
-        self.chart.parent_scroll = chart_scroll
+        self.chart.size = (800, 600)
         
         chart_container.add_widget(self.chart)
         chart_scroll.add_widget(chart_container)
         layout.add_widget(chart_scroll)
         
-        # 刷新按钮
         refresh_btn = Button(
             text='刷新图表',
             font_size=44,
@@ -1027,7 +981,6 @@ class WeightTrackerApp(App):
         refresh_btn.bind(on_press=self.update_chart)
         layout.add_widget(refresh_btn)
         
-        # 初始化图表
         Clock.schedule_once(self.update_chart, 0.1)
         
         return layout
@@ -1035,11 +988,9 @@ class WeightTrackerApp(App):
     def create_diary_tab(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # 标题
         title = Label(text='减肥日记', font_size=52, size_hint_y=0.05)
         layout.add_widget(title)
         
-        # 今日饮食
         layout.add_widget(Label(text='今日饮食:', font_size=44, size_hint_y=0.05))
         
         self.food_input = TextInput(
@@ -1050,7 +1001,6 @@ class WeightTrackerApp(App):
         )
         layout.add_widget(self.food_input)
         
-        # 减肥心得
         layout.add_widget(Label(text='减肥心得:', font_size=44, size_hint_y=0.05))
         
         self.thoughts_input = TextInput(
@@ -1061,7 +1011,6 @@ class WeightTrackerApp(App):
         )
         layout.add_widget(self.thoughts_input)
         
-        # 保存按钮
         save_btn = Button(
             text='保存日记',
             font_size=44,
@@ -1071,7 +1020,6 @@ class WeightTrackerApp(App):
         save_btn.bind(on_press=self.save_diary)
         layout.add_widget(save_btn)
         
-        # 日记显示
         self.diary_display = Label(
             text='最近日记记录：\n\n',
             font_size=38,
@@ -1086,7 +1034,6 @@ class WeightTrackerApp(App):
         scroll.add_widget(self.diary_display)
         layout.add_widget(scroll)
         
-        # 初始化显示 - 加载今天的日记
         Clock.schedule_once(self.load_today_diary, 0.1)
         Clock.schedule_once(self.update_diary_display, 0.1)
         
@@ -1095,27 +1042,22 @@ class WeightTrackerApp(App):
     def create_data_tab(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # 标题
         title = Label(text='数据管理', font_size=52, size_hint_y=0.1)
         layout.add_widget(title)
         
-        # 创建一个容器来使按钮在页面中完全居中
         center_container = BoxLayout(
             orientation='vertical',
             size_hint_y=0.9
         )
         
-        # 顶部占位空间
         center_container.add_widget(Widget(size_hint_y=0.2))
         
-        # 按钮容器 - 垂直排列按钮
         button_container = BoxLayout(
             orientation='vertical',
             spacing=20,
             size_hint_y=0.6
         )
         
-        # 导出按钮 - 固定大小
         export_btn = Button(
             text='导出数据(Excel)',
             font_size=44,
@@ -1125,7 +1067,6 @@ class WeightTrackerApp(App):
         )
         export_btn.bind(on_press=self.export_data)
         
-        # 导入按钮 - 固定大小
         import_btn = Button(
             text='导入数据(Excel)',
             font_size=44,
@@ -1135,9 +1076,8 @@ class WeightTrackerApp(App):
         )
         import_btn.bind(on_press=self.import_data)
         
-        # 查看导出文件位置按钮 - 固定大小
         file_location_btn = Button(
-            text='查看导出文件位置',
+            text='查看文件位置',
             font_size=44,
             background_color=(0.8, 0.6, 0.2, 1),
             size_hint=(None, None),
@@ -1145,7 +1085,6 @@ class WeightTrackerApp(App):
         )
         file_location_btn.bind(on_press=self.show_file_location)
         
-        # 使用说明按钮 - 固定大小
         instructions_btn = Button(
             text='使用说明',
             font_size=44,
@@ -1155,7 +1094,6 @@ class WeightTrackerApp(App):
         )
         instructions_btn.bind(on_press=self.show_instructions)
         
-        # 创建一个水平容器来使按钮水平居中
         export_container = BoxLayout(orientation='horizontal')
         export_container.add_widget(Widget(size_hint_x=0.5))
         export_container.add_widget(export_btn)
@@ -1176,19 +1114,14 @@ class WeightTrackerApp(App):
         instructions_container.add_widget(instructions_btn)
         instructions_container.add_widget(Widget(size_hint_x=0.5))
         
-        # 将按钮添加到按钮容器
         button_container.add_widget(export_container)
         button_container.add_widget(import_container)
         button_container.add_widget(file_location_container)
         button_container.add_widget(instructions_container)
         
-        # 将按钮容器添加到居中容器
         center_container.add_widget(button_container)
-        
-        # 底部占位空间
         center_container.add_widget(Widget(size_hint_y=0.2))
         
-        # 将居中容器添加到主布局
         layout.add_widget(center_container)
         
         return layout
@@ -1242,19 +1175,16 @@ class WeightTrackerApp(App):
             self.weight_diff.text = "体重差值: 暂无数据"
     
     def update_chart(self, instance=None):
-        """更新图表数据"""
-        # 根据选择的时间范围确定天数
         range_text = self.chart_range_spinner.text
         if range_text == '最近7天':
             days = 7
         elif range_text == '最近30天':
             days = 30
-        else:  # 全部数据
-            days = 365  # 假设一年内的数据
+        else:
+            days = 365
         
         chart_data = self.db.get_chart_data(days)
         
-        # 根据选择的图表类型显示相应数据
         chart_type = self.chart_type_spinner.text
         if chart_type == '早晨体重':
             data_points = chart_data['morning_weights']
@@ -1264,25 +1194,20 @@ class WeightTrackerApp(App):
             data_points = chart_data['evening_weights']
             labels = chart_data['labels']
             self.chart.chart_title = "晚上体重趋势图"
-        else:  # 全部体重
-            # 合并早晨和晚上体重
+        else:
             data_points = chart_data['morning_weights'] + chart_data['evening_weights']
-            # 创建对应的标签
             labels = chart_data['labels'] + [f"{label}(晚)" for label in chart_data['labels']]
             self.chart.chart_title = "全部体重趋势图"
         
         self.chart.set_data(data_points, labels)
     
     def on_chart_type_change(self, spinner, text):
-        """图表类型改变时更新图表"""
         self.update_chart()
     
     def on_chart_range_change(self, spinner, text):
-        """时间范围改变时更新图表"""
         self.update_chart()
     
     def load_today_diary(self, dt=None):
-        """加载今天的日记"""
         today_entry = self.db.get_today_diary_entry()
         if today_entry:
             self.food_input.text = today_entry['food'] or ""
@@ -1316,11 +1241,9 @@ class WeightTrackerApp(App):
     
     def export_data(self, instance):
         try:
-            # 获取所有数据
             weight_records = self.db.get_all_records()
             diary_entries = self.db.get_all_diary_entries()
             
-            # 创建DataFrame - 将英文时间类型转换为中文
             weight_data = []
             for record in weight_records:
                 date_str, weight_type_en, weight = record
@@ -1330,20 +1253,12 @@ class WeightTrackerApp(App):
             weight_df = pd.DataFrame(weight_data, columns=['日期', '时间类型', '体重(斤)'])
             diary_df = pd.DataFrame(diary_entries, columns=['日期', '饮食记录', '减肥心得'])
             
-            # 在Android上，我们可以使用应用的数据目录
-            if IS_ANDROID:
-                base_dir = self.user_data_dir
-            else:
-                base_dir = os.path.expanduser("~")
+            export_path = self.db.get_export_path("weight_data_export.xlsx")
             
-            export_path = os.path.join(base_dir, "weight_data_export.xlsx")
-            
-            # 使用ExcelWriter创建包含多个工作表的Excel文件
             with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
                 weight_df.to_excel(writer, sheet_name='体重记录', index=False)
                 diary_df.to_excel(writer, sheet_name='减肥日记', index=False)
             
-            # 显示详细的导出信息
             message = f"数据已导出到Excel文件:\n{export_path}\n\n"
             message += f"文件大小: {os.path.getsize(export_path)} 字节\n"
             message += f"导出时间: {datetime.now().strftime('%Y/%m/%d %H:%M:%S')}\n\n"
@@ -1356,49 +1271,43 @@ class WeightTrackerApp(App):
             self.show_popup("导出失败", f"错误: {str(e)}")
     
     def show_file_location(self, instance):
-        """显示导出文件的位置信息"""
-        if IS_ANDROID:
-            base_dir = self.user_data_dir
+        """显示文件位置信息"""
+        db_path = self.db.db_path
+        export_path = self.db.get_export_path("weight_data_export.xlsx")
+        
+        message = "文件位置信息:\n\n"
+        message += f"数据库文件: {db_path}\n"
+        message += f"导出文件: {export_path}\n\n"
+        
+        if os.path.exists(db_path):
+            db_size = os.path.getsize(db_path)
+            message += f"数据库状态: 已存在 ({db_size} 字节)\n"
         else:
-            base_dir = os.path.expanduser("~")
-        
-        export_path = os.path.join(base_dir, "weight_data_export.xlsx")
-        
-        message = "导出文件位置信息:\n\n"
-        message += f"文件路径: {export_path}\n\n"
+            message += "数据库状态: 尚未创建\n"
         
         if os.path.exists(export_path):
-            file_size = os.path.getsize(export_path)
+            export_size = os.path.getsize(export_path)
             mod_time = datetime.fromtimestamp(os.path.getmtime(export_path))
-            message += f"文件状态: 已存在\n"
-            message += f"文件大小: {file_size} 字节\n"
-            message += f"修改时间: {mod_time.strftime('%Y/%m/%d %H:%M:%S')}\n\n"
+            message += f"导出文件状态: 已存在 ({export_size} 字节)\n"
+            message += f"最后修改: {mod_time.strftime('%Y/%m/%d %H:%M:%S')}\n"
         else:
-            message += f"文件状态: 尚未导出\n\n"
+            message += "导出文件状态: 尚未导出\n"
         
-        message += "在Android设备上查找文件的方法:\n"
+        message += "\n在Android设备上查找文件的方法:\n"
         message += "1. 使用文件管理器应用\n"
         message += "2. 查找应用数据目录\n"
-        message += "3. 或者连接电脑通过USB传输文件查看\n\n"
-        message += "在Pydroid中，你可以在侧边栏的文件浏览器中查找"
+        message += "3. 或者连接电脑通过USB传输文件查看"
         
         self.show_popup("文件位置", message)
     
     def import_data(self, instance):
         try:
-            if IS_ANDROID:
-                base_dir = self.user_data_dir
-            else:
-                base_dir = os.path.expanduser("~")
-            
-            import_path = os.path.join(base_dir, "weight_data_export.xlsx")
+            import_path = self.db.get_export_path("weight_data_export.xlsx")
             
             if os.path.exists(import_path):
-                # 读取Excel文件
                 weight_df = pd.read_excel(import_path, sheet_name='体重记录')
                 diary_df = pd.read_excel(import_path, sheet_name='减肥日记')
                 
-                # 转换为列表格式 - 注意：时间类型已经是中文，导入时会自动转换为英文
                 weight_records = weight_df.values.tolist()
                 diary_entries = diary_df.values.tolist()
                 
@@ -1409,12 +1318,11 @@ class WeightTrackerApp(App):
                 
                 if self.db.import_data(data):
                     self.show_popup("导入成功", "Excel数据导入成功！")
-                    # 更新显示
                     self.update_records_display()
                     self.update_statistics()
                     self.update_chart()
                     self.update_diary_display()
-                    self.load_today_diary()  # 重新加载今天的日记
+                    self.load_today_diary()
                 else:
                     self.show_popup("导入失败", "数据导入失败")
             else:
@@ -1464,10 +1372,8 @@ class WeightTrackerApp(App):
 
 祝您减肥成功，健康每一天！
 """
-        # 创建可滚动的使用说明窗口
         content = BoxLayout(orientation='vertical', spacing=10)
         
-        # 标题
         title_label = Label(
             text="使用说明", 
             font_size=48,
@@ -1475,7 +1381,6 @@ class WeightTrackerApp(App):
         )
         content.add_widget(title_label)
         
-        # 滚动内容
         scroll = ScrollView()
         instructions_label = Label(
             text=instructions,
@@ -1490,7 +1395,6 @@ class WeightTrackerApp(App):
         scroll.add_widget(instructions_label)
         content.add_widget(scroll)
         
-        # 确定按钮
         ok_btn = Button(
             text='确定',
             font_size=44,
@@ -1508,10 +1412,8 @@ class WeightTrackerApp(App):
         popup.open()
     
     def show_popup(self, title, message):
-        # 创建可滚动的弹出窗口
         content = BoxLayout(orientation='vertical', spacing=10)
         
-        # 标题
         title_label = Label(
             text=title,
             font_size=46,
@@ -1519,7 +1421,6 @@ class WeightTrackerApp(App):
         )
         content.add_widget(title_label)
         
-        # 滚动内容
         scroll = ScrollView()
         message_label = Label(
             text=message,
@@ -1534,7 +1435,6 @@ class WeightTrackerApp(App):
         scroll.add_widget(message_label)
         content.add_widget(scroll)
         
-        # 确定按钮
         ok_btn = Button(
             text='确定',
             font_size=44,
@@ -1555,6 +1455,5 @@ if __name__ == '__main__':
     try:
         WeightTrackerApp().run()
     except Exception as e:
-        # 如果应用崩溃，记录错误
         with open("crash_log.txt", "w") as f:
             f.write(f"应用崩溃: {str(e)}")
