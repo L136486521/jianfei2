@@ -30,9 +30,6 @@ fullscreen = 0
 # 依赖配置 - 完整版本
 requirements = python3,kivy==2.1.0,sqlite3,openssl,requests,urllib3,chardet,idna,certifi,setuptools,pip,pandas,numpy,openpyxl,android
 
-# 额外的依赖
-android.gradle_dependencies = 'com.android.support:support-v4:28.0.0'
-
 # 构建配置
 build_type = debug
 p4a.branch = master
