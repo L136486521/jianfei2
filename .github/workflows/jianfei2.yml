@@ -44,14 +44,18 @@ jobs:
           autoconf \
           automake \
           libtool \
-          pkg-config
+          pkg-config \
+          libncurses5-dev \
+          libgdbm-dev \
+          libnss3-dev \
+          libsqlite3-dev
         
     - name: Install Buildozer and dependencies
       run: |
         pip install --upgrade pip
         pip install buildozer==1.5.0
         pip install cython==0.29.33
-        pip install kivy==2.1.0 kivymd==1.1.1
+        pip install kivy==2.1.0
         pip install pandas openpyxl numpy
         
     - name: Pre-accept Android SDK licenses
@@ -62,8 +66,6 @@ jobs:
         echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
         echo "601085b94cd77f0b54ff86406957099ebe79c4d6" >> ~/.android/licenses/android-sdk-preview-license
-        echo "已设置的许可证:"
-        cat ~/.android/licenses/*
         
     - name: Build APK with license handling
       run: |
