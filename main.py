@@ -13,7 +13,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.popup import Popup
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.uix.widget import Widget
-from kivy.graphics import Color, Line, Rectangle, InstructionGroup
+from kivy.graphics import Color, Line, Rectangle
 from kivy.clock import Clock
 from kivy.logger import Logger
 from kivy.metrics import dp
@@ -21,6 +21,20 @@ import platform
 
 # 检查当前平台
 IS_ANDROID = platform.system() == "Linux" and "ANDROID_ARGUMENT" in os.environ
+
+# 在Android上设置环境变量
+if IS_ANDROID:
+    try:
+        from android import mActivity
+        from android.storage import app_storage_path, primary_external_storage_path
+        from android.permissions import request_permissions, Permission
+        # 请求必要的权限
+        request_permissions([
+            Permission.WRITE_EXTERNAL_STORAGE,
+            Permission.READ_EXTERNAL_STORAGE
+        ])
+    except Exception as e:
+        Logger.warning(f"Android: 权限请求失败 - {str(e)}")
 
 def format_date(date_obj):
     """将日期格式化为 YYYY/MM/DD 格式"""
@@ -122,12 +136,6 @@ class SimpleChart(Widget):
                 width=1
             )
             
-            Color(*self.text_color)
-            Rectangle(
-                pos=(margin_left - dp(50), y - dp(10)),
-                size=(dp(45), dp(20))
-            )
-            
         num_points = len(self.data_points)
         if num_points > 0:
             step = max(1, num_points // 5)
@@ -139,12 +147,6 @@ class SimpleChart(Widget):
                         points=[x, margin_bottom, x, margin_bottom + chart_height],
                         width=1
                     )
-                    
-                    Color(*self.text_color)
-                    Rectangle(
-                        pos=(x - dp(20), margin_bottom - dp(30)),
-                        size=(dp(40), dp(20))
-                    )
         
         Color(0, 0, 0, 1)
         Line(
@@ -154,20 +156,6 @@ class SimpleChart(Widget):
         Line(
             points=[margin_left, margin_bottom, margin_left + chart_width, margin_bottom],
             width=2
-        )
-        
-        Color(*self.text_color)
-        Rectangle(
-            pos=(dp(10), self.center_y - dp(50)),
-            size=(dp(100), dp(20))
-        )
-        Rectangle(
-            pos=(self.center_x - dp(25), dp(10)),
-            size=(dp(50), dp(20))
-        )
-        Rectangle(
-            pos=(self.center_x - dp(50), self.height - dp(30)),
-            size=(dp(100), dp(20))
         )
     
     def draw_data_line(self):
@@ -229,96 +217,71 @@ class WeightDatabase:
         self.init_database()
     
     def get_db_path(self):
-        """获取数据库路径，优先使用应用数据目录"""
+        """获取数据库路径"""
         if IS_ANDROID:
-            # 在Android上使用应用数据目录
             try:
-                from android.storage import app_storage_path
-                base_dir = app_storage_path()
-            except:
-                # 如果上面的方法失败，使用kivy的应用数据目录
-                try:
-                    from kivy.app import App
-                    app = App.get_running_app()
-                    if app:
-                        base_dir = app.user_data_dir
-                    else:
-                        base_dir = "/data/data/org.test.weighttracker/files"
-                except:
-                    base_dir = "/data/data/org.test.weighttracker/files"
-            
-            # 确保目录存在
-            if not os.path.exists(base_dir):
-                try:
+                # 使用Kivy的应用数据目录
+                from kivy.app import App
+                app = App.get_running_app()
+                if app:
+                    base_dir = app.user_data_dir
+                else:
+                    # 备用方案
+                    base_dir = "/data/data/org.example.weighttracker/files/app"
+                
+                # 确保目录存在
+                if not os.path.exists(base_dir):
                     os.makedirs(base_dir)
-                except:
-                    base_dir = "/data/data/org.test.weighttracker/files"
-            
-            db_path = os.path.join(base_dir, "weight_data.db")
+                
+                db_path = os.path.join(base_dir, "weight_data.db")
+                Logger.info(f"Database: Android数据库路径 - {db_path}")
+                return db_path
+                
+            except Exception as e:
+                Logger.error(f"Database: 获取Android路径失败 - {str(e)}")
+                return "/data/data/org.example.weighttracker/files/weight_data.db"
         else:
             # 在PC上使用当前目录
             db_path = "weight_data.db"
-        
-        return db_path
+            Logger.info(f"Database: PC数据库路径 - {db_path}")
+            return db_path
     
     def get_export_path(self, filename):
         """获取导出文件路径"""
         if IS_ANDROID:
-            # 在Android上，尝试使用下载目录或文档目录
             try:
-                from android.storage import primary_external_storage_path
-                base_dir = primary_external_storage_path()
-                download_dir = os.path.join(base_dir, "Download")
-                if os.path.exists(download_dir):
-                    return os.path.join(download_dir, filename)
+                from kivy.app import App
+                app = App.get_running_app()
+                if app:
+                    base_dir = app.user_data_dir
                 else:
-                    # 如果Download目录不存在，使用应用数据目录
-                    return os.path.join(self.get_db_path().rsplit('/', 1)[0], filename)
-            except:
-                # 如果上面的方法失败，使用应用数据目录
-                return os.path.join(self.get_db_path().rsplit('/', 1)[0], filename)
+                    base_dir = "/data/data/org.example.weighttracker/files/app"
+                
+                export_dir = os.path.join(base_dir, "exports")
+                if not os.path.exists(export_dir):
+                    os.makedirs(export_dir)
+                
+                export_path = os.path.join(export_dir, filename)
+                Logger.info(f"Database: 导出路径 - {export_path}")
+                return export_path
+                
+            except Exception as e:
+                Logger.error(f"Database: 获取导出路径失败 - {str(e)}")
+                return filename
         else:
-            # 在PC上使用当前目录
             return filename
     
     def init_database(self):
-        try:
-            # 确保目录存在
-            db_dir = os.path.dirname(self.db_path)
-            if db_dir and not os.path.exists(db_dir):
-                os.makedirs(db_dir)
-            
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS weight_records (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT NOT NULL,
-                    weight_type TEXT NOT NULL,
-                    weight REAL NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS diary_entries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT NOT NULL,
-                    food TEXT,
-                    thoughts TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            conn.commit()
-            conn.close()
-            Logger.info("Database: 数据库初始化成功")
-        except Exception as e:
-            Logger.error(f"Database: 数据库初始化失败 - {str(e)}")
-            # 尝试使用内存数据库作为后备
+        """初始化数据库"""
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
-                self.db_path = ":memory:"
+                # 确保目录存在
+                db_dir = os.path.dirname(self.db_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir)
+                    Logger.info(f"Database: 创建目录 - {db_dir}")
+                
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
                 
@@ -344,9 +307,43 @@ class WeightDatabase:
                 
                 conn.commit()
                 conn.close()
-                Logger.info("Database: 使用内存数据库成功")
-            except Exception as e2:
-                Logger.error(f"Database: 内存数据库也失败 - {str(e2)}")
+                Logger.info("Database: 数据库初始化成功")
+                return
+                
+            except Exception as e:
+                Logger.error(f"Database: 数据库初始化失败 (尝试 {attempt + 1}/{max_retries}) - {str(e)}")
+                if attempt == max_retries - 1:
+                    # 最后一次尝试失败，使用内存数据库
+                    try:
+                        self.db_path = ":memory:"
+                        conn = sqlite3.connect(self.db_path)
+                        cursor = conn.cursor()
+                        
+                        cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS weight_records (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                date TEXT NOT NULL,
+                                weight_type TEXT NOT NULL,
+                                weight REAL NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS diary_entries (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                date TEXT NOT NULL,
+                                food TEXT,
+                                thoughts TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        conn.commit()
+                        conn.close()
+                        Logger.info("Database: 使用内存数据库成功")
+                    except Exception as e2:
+                        Logger.error(f"Database: 内存数据库也失败 - {str(e2)}")
     
     def get_connection(self):
         """获取数据库连接"""
@@ -745,13 +742,17 @@ class WeightDatabase:
             return False
 
 class WeightTrackerApp(App):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.db = None
+    
     def build(self):
         try:
             # 设置应用标题
-            self.title = "体重追踪器"
+            self.title = "减肥体重记录器"
             
-            # 创建数据库实例，传入app实例
-            self.db = WeightDatabase(self)
+            # 延迟创建数据库，确保应用完全启动
+            Clock.schedule_once(self.initialize_database, 0.5)
             
             # 创建主界面
             main_layout = TabbedPanel(tab_pos='bottom_mid')
@@ -783,34 +784,53 @@ class WeightTrackerApp(App):
             data_tab.add_widget(self.create_data_tab())
             main_layout.add_widget(data_tab)
             
-            Logger.info("App: 应用初始化成功")
+            Logger.info("App: 应用界面初始化成功")
             return main_layout
+            
         except Exception as e:
             Logger.error(f"App: 应用初始化失败 - {str(e)}")
-            # 返回错误界面
-            layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-            layout.add_widget(Label(text='应用启动失败', font_size=52))
-            layout.add_widget(Label(text=f'错误: {str(e)}', font_size=44))
+            return self.create_error_layout(str(e))
+    
+    def initialize_database(self, dt):
+        """延迟初始化数据库"""
+        try:
+            self.db = WeightDatabase(self)
+            Logger.info("App: 数据库初始化成功")
             
-            # 添加重启按钮
-            restart_btn = Button(
-                text='重启应用',
-                font_size=44,
-                background_color=(0.8, 0.2, 0.2, 1)
-            )
-            restart_btn.bind(on_press=self.restart_app)
-            layout.add_widget(restart_btn)
+            # 初始化显示数据
+            self.update_records_display()
+            self.update_statistics()
+            self.update_chart()
+            self.load_today_diary()
+            self.update_diary_display()
             
-            return layout
+        except Exception as e:
+            Logger.error(f"App: 数据库初始化失败 - {str(e)}")
+            self.show_popup("错误", f"数据库初始化失败: {str(e)}")
+    
+    def create_error_layout(self, error_msg):
+        """创建错误界面"""
+        layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        layout.add_widget(Label(text='应用启动失败', font_size=52))
+        layout.add_widget(Label(text=f'错误: {error_msg}', font_size=36))
+        
+        restart_btn = Button(
+            text='重启应用',
+            font_size=44,
+            background_color=(0.8, 0.2, 0.2, 1)
+        )
+        restart_btn.bind(on_press=self.restart_app)
+        layout.add_widget(restart_btn)
+        
+        return layout
     
     def restart_app(self, instance):
         """重启应用"""
         try:
-            from kivy.app import App
             App.get_running_app().stop()
             WeightTrackerApp().run()
-        except:
-            pass
+        except Exception as e:
+            Logger.error(f"App: 重启失败 - {str(e)}")
     
     def create_record_tab(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
@@ -1127,27 +1147,33 @@ class WeightTrackerApp(App):
         return layout
     
     def record_weight(self, instance):
-        weight_text = self.weight_input.text
-        try:
-            weight = float(weight_text)
-            if 20 <= weight <= 400:
-                current_date = format_date(date.today())
-                weight_type = 'morning' if self.time_spinner.text == '早晨' else 'evening'
+            if not self.db:
+                self.show_popup("错误", "数据库未初始化，请重启应用")
+                return
                 
-                if self.db.add_weight_record(current_date, weight_type, weight):
-                    self.weight_input.text = ""
-                    self.update_records_display()
-                    self.update_statistics()
-                    self.update_chart()
-                    self.show_popup("成功", f"{self.time_spinner.text}体重记录成功！")
+            weight_text = self.weight_input.text
+            try:
+                weight = float(weight_text)
+                if 20 <= weight <= 400:
+                    current_date = format_date(date.today())
+                    weight_type = 'morning' if self.time_spinner.text == '早晨' else 'evening'
+                    
+                    if self.db.add_weight_record(current_date, weight_type, weight):
+                        self.weight_input.text = ""
+                        self.update_records_display()
+                        self.update_statistics()
+                        self.update_chart()
+                        self.show_popup("成功", f"{self.time_spinner.text}体重记录成功！")
+                    else:
+                        self.show_popup("错误", "体重记录失败，请重试")
                 else:
-                    self.show_popup("错误", "体重记录失败，请重试")
-            else:
-                self.show_popup("错误", "体重必须在20-400斤之间")
-        except ValueError:
-            self.show_popup("错误", "请输入有效的数字")
+                    self.show_popup("错误", "体重必须在20-400斤之间")
+            except ValueError:
+                self.show_popup("错误", "请输入有效的数字")
     
     def update_records_display(self, dt=None):
+        if not self.db:
+            return
         records = self.db.get_recent_records(7)
         display_text = "最近体重记录：\n\n"
         
@@ -1159,6 +1185,8 @@ class WeightTrackerApp(App):
         self.records_label.text = display_text
     
     def update_statistics(self, instance=None):
+        if not self.db:
+            return
         stats = self.db.get_weight_statistics()
         
         if stats:
@@ -1214,6 +1242,9 @@ class WeightTrackerApp(App):
             self.thoughts_input.text = today_entry['thoughts'] or ""
     
     def save_diary(self, instance):
+        if not self.db:
+            self.show_popup("错误", "数据库未初始化，请重启应用")
+            return
         food_text = self.food_input.text
         thoughts_text = self.thoughts_input.text
         current_date = format_date(date.today())
@@ -1240,6 +1271,9 @@ class WeightTrackerApp(App):
         self.diary_display.text = diary_text
     
     def export_data(self, instance):
+        if not self.db:
+            self.show_popup("错误", "数据库未初始化，请重启应用")
+            return
         try:
             weight_records = self.db.get_all_records()
             diary_entries = self.db.get_all_diary_entries()
@@ -1301,6 +1335,9 @@ class WeightTrackerApp(App):
         self.show_popup("文件位置", message)
     
     def import_data(self, instance):
+        if not self.db:
+            self.show_popup("错误", "数据库未初始化，请重启应用")
+            return
         try:
             import_path = self.db.get_export_path("weight_data_export.xlsx")
             
@@ -1453,7 +1490,34 @@ class WeightTrackerApp(App):
 
 if __name__ == '__main__':
     try:
+        # 设置更详细的日志
+        import logging
+        from kivy.logger import Logger
+        
+        # 在Android上创建日志文件
+        if IS_ANDROID:
+            log_path = "/data/data/org.example.weighttracker/files/app_log.txt"
+            log_dir = os.path.dirname(log_path)
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            
+            # 添加文件处理器
+            file_handler = logging.FileHandler(log_path)
+            file_handler.setLevel(logging.INFO)
+            Logger.addHandler(file_handler)
+        
+        Logger.info("App: 开始启动应用")
         WeightTrackerApp().run()
+        
     except Exception as e:
-        with open("crash_log.txt", "w") as f:
-            f.write(f"应用崩溃: {str(e)}")
+        Logger.error(f"App: 应用启动失败 - {str(e)}")
+        # 在Android上写入错误日志
+        if IS_ANDROID:
+            try:
+                error_log_path = "/data/data/org.example.weighttracker/files/error_log.txt"
+                with open(error_log_path, "w") as f:
+                    f.write(f"应用启动失败: {str(e)}\n")
+                    import traceback
+                    f.write(traceback.format_exc())
+            except:
+                pass
