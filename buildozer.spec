@@ -3,15 +3,22 @@ title = 减肥体重记录器
 package.name = weighttracker
 package.domain = org.example
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas
+source.include_exts = py,png,jpg,kv,atlas,ttf
 main = main.py
 version = 1.0
 
 # Android 配置
-android.api = 30
+android.api = 33
 android.minapi = 21
-android.targetapi = 30
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+android.targetapi = 33
+android.ndk = 25b
+android.sdk = 28
+android.ndk_api = 21
+android.allow_backup = True
+android.gradle_dependencies = 'com.android.support:support-v4:28.0.0'
+
+# 权限配置
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
 
 # 应用图标
 icon.filename = %(source.dir)s/icon.png
@@ -20,11 +27,18 @@ presplash.filename = %(source.dir)s/presplash.png
 orientation = portrait
 fullscreen = 0
 
-# 依赖配置 - 简化版本
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,android
+# 依赖配置 - 完整版本
+requirements = python3,kivy==2.1.0,sqlite3,openssl,requests,urllib3,chardet,idna,certifi,setuptools,pip,pandas,numpy,openpyxl,android
 
-# 构建模式
+# 额外的依赖
+android.gradle_dependencies = 'com.android.support:support-v4:28.0.0'
+
+# 构建配置
 build_type = debug
+p4a.branch = master
+
+# 日志级别
+log_level = 2
 
 [buildozer]
 log_level = 2
