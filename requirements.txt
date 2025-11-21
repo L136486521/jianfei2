@@ -1,0 +1,38 @@
+# Kivy 核心框架
+kivy==2.3.0
+kivymd==1.2.0
+
+# 数据库相关
+sqlite3
+
+# 网络请求
+requests==2.31.0
+urllib3==2.0.4
+chardet==5.2.0
+idna==3.4
+certifi==2023.7.22
+
+# 数据处理和分析
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.2
+
+# 工具包
+setuptools==68.2.2
+pip==23.3.1
+
+# Android 支持
+android
+
+# 图像处理
+Pillow==10.0.1
+
+# 日期时间处理
+python-dateutil==2.8.2
+pytz==2023.3
+
+# 数据序列化
+pyyaml==6.0.1
+
+# 日志记录
+loguru==0.7.2
