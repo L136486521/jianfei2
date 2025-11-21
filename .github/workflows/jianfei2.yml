@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # 推荐使用最新Ubuntu版本
+    runs-on: ubuntu-20.04  # 使用Ubuntu 20.04确保稳定性
 
     steps:
     - name: Checkout code
@@ -17,62 +17,60 @@ jobs:
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'  # 更稳定的Python版本
+        python-version: '3.10'
 
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
+        sudo apt-get install -y \
           build-essential \
           git \
           zip \
           unzip \
+          openjdk-11-jdk \
           zlib1g-dev \
-          libffi-dev \
-          libssl-dev \
-          wget \
-          curl \
-          libltdl-dev \
-          expect \
-          gettext \
-          autoconf \
-          automake \
-          libtool \
-          pkg-config \
           libncurses5-dev \
           libgdbm-dev \
           libnss3-dev \
+          libssl-dev \
+          libreadline-dev \
+          libffi-dev \
           libsqlite3-dev \
-          openjdk-11-jdk  # 使用Java 11
+          wget \
+          curl
 
-    - name: Set up Android SDK/NDK
-      uses: android-actions/setup-android@v3  # 官方Action安装SDK/NDK
-      with:
-        api-level: 34  # 匹配你的buildozer.spec配置
-        ndk-version: r25b
+    - name: Set up Android SDK
+      run: |
+        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
+        mkdir -p android-sdk/cmdline-tools
+        unzip commandlinetools-linux-8512546_latest.zip -d android-sdk/cmdline-tools
+        mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
+        echo "ANDROID_HOME=$PWD/android-sdk" >> $GITHUB_ENV
+        echo "$PWD/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$PWD/android-sdk/platform-tools" >> $GITHUB_PATH
 
     - name: Accept Android licenses
       run: |
-        yes | sdkmanager --licenses  # 自动接受所有许可证
+        yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
 
-    - name: Install Python dependencies
+    - name: Install Android platforms and build tools
+      run: |
+        android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;30.0.3" "platform-tools"
+
+    - name: Install Buildozer and dependencies
       run: |
         pip install --upgrade pip
-        pip install buildozer==1.5.0 cython==0.29.33
-        pip install -r requirements.txt  # 从文件安装依赖
+        pip install buildozer==1.5.0 cython==0.29.33 virtualenv
+        pip install -r requirements.txt
 
-    - name: Build APK
+    - name: Build APK with Buildozer
       run: |
+        buildozer init
         buildozer -v android debug
-        # 直接检查APK是否存在
-        if [ ! -f bin/*.apk ]; then
-          echo "APK构建失败！"
-          exit 1
-        fi
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: jianfei-app
+        name: weight-tracker-apk
         path: bin/*.apk
         retention-days: 30
