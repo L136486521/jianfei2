@@ -1,4 +1,5 @@
 name: Build Android APK
+
 on:
   push:
     branches: [ main, master ]
@@ -7,28 +8,21 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    
+    runs-on: ubuntu-latest  # 推荐使用最新Ubuntu版本
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Set up Java 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        
-    - name: Set up Python
+
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
-        
+        python-version: '3.10'  # 更稳定的Python版本
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          python3-pip \
+        sudo apt-get install -y --no-install-recommends \
           build-essential \
           git \
           zip \
@@ -48,53 +42,35 @@ jobs:
           libncurses5-dev \
           libgdbm-dev \
           libnss3-dev \
-          libsqlite3-dev
-        
-    - name: Install Buildozer and dependencies
+          libsqlite3-dev \
+          openjdk-11-jdk  # 使用Java 11
+
+    - name: Set up Android SDK/NDK
+      uses: android-actions/setup-android@v3  # 官方Action安装SDK/NDK
+      with:
+        api-level: 34  # 匹配你的buildozer.spec配置
+        ndk-version: r25b
+
+    - name: Accept Android licenses
+      run: |
+        yes | sdkmanager --licenses  # 自动接受所有许可证
+
+    - name: Install Python dependencies
       run: |
         pip install --upgrade pip
-        pip install buildozer==1.5.0
-        pip install cython==0.29.33
-        pip install kivy==2.1.0
-        pip install pandas openpyxl numpy
-        
-    - name: Pre-accept Android SDK licenses
+        pip install buildozer==1.5.0 cython==0.29.33
+        pip install -r requirements.txt  # 从文件安装依赖
+
+    - name: Build APK
       run: |
-        mkdir -p ~/.android/licenses
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
-        echo "601085b94cd77f0b54ff86406957099ebe79c4d6" >> ~/.android/licenses/android-sdk-preview-license
-        
-    - name: Build APK with license handling
-      run: |
-        echo "开始构建 APK..."
-        
-        # 使用 expect 自动处理构建过程中的交互
-        expect -c "
-        set timeout 1800
-        spawn buildozer -v android debug
-        expect {
-            \"Accept? (y/N):\" { exp_send \"y\r\"; exp_continue }
-            \"y/N\" { exp_send \"y\r\"; exp_continue }
-            \"Do you accept the license\" { exp_send \"y\r\"; exp_continue }
-            \"yes/no\" { exp_send \"yes\r\"; exp_continue }
-            eof
-        }
-        "
-        
-        # 检查是否构建成功
-        if [ -f bin/*.apk ]; then
-          echo "APK 构建成功!"
-          ls -la bin/
-        else
-          echo "APK 构建失败，尝试直接构建..."
-          buildozer -v android debug
+        buildozer -v android debug
+        # 直接检查APK是否存在
+        if [ ! -f bin/*.apk ]; then
+          echo "APK构建失败！"
+          exit 1
         fi
-      timeout-minutes: 120
-      
-    - name: Upload APK
+
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: jianfei-app
