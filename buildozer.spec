@@ -27,8 +27,8 @@ presplash.filename = %(source.dir)s/presplash.png
 orientation = portrait
 fullscreen = 0
 
-# 依赖配置 - 修复版本兼容性
-requirements = python3,kivy==2.1.0,sqlite3,openssl,requests,urllib3,certifi,setuptools,pandas==1.5.3,numpy==1.24.3,openpyxl==3.1.2,android
+# 依赖配置
+requirements = python3,kivy==2.1.0,openssl,requests,urllib3,certifi,setuptools,pandas==1.5.3,numpy==1.24.3,openpyxl==3.0.10,android
 
 # 构建配置
 build_type = debug
