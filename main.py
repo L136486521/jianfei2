@@ -19,6 +19,10 @@ from kivy.logger import Logger
 from kivy.metrics import dp
 import platform
 
+if platform == 'android':
+    from android.permissions import request_permissions, Permission
+    request_permissions([Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE])
+
 # 检查当前平台
 IS_ANDROID = platform.system() == "Linux" and "ANDROID_ARGUMENT" in os.environ
 
@@ -213,38 +217,13 @@ class WeightDatabase:
     def __init__(self, app_instance=None):
         self.app = app_instance
         self.db_path = self.get_db_path()
-        Logger.info(f"Database: 数据库路径 - {self.db_path}")
-        self.init_database()
     
     def get_db_path(self):
-        """获取数据库路径"""
-        if IS_ANDROID:
-            try:
-                # 使用Kivy的应用数据目录
-                from kivy.app import App
-                app = App.get_running_app()
-                if app:
-                    base_dir = app.user_data_dir
-                else:
-                    # 备用方案
-                    base_dir = "/data/data/org.example.weighttracker/files/app"
-                
-                # 确保目录存在
-                if not os.path.exists(base_dir):
-                    os.makedirs(base_dir)
-                
-                db_path = os.path.join(base_dir, "weight_data.db")
-                Logger.info(f"Database: Android数据库路径 - {db_path}")
-                return db_path
-                
-            except Exception as e:
-                Logger.error(f"Database: 获取Android路径失败 - {str(e)}")
-                return "/data/data/org.example.weighttracker/files/weight_data.db"
+        if platform == 'android':
+            from android.storage import app_storage_path
+            return os.path.join(app_storage_path, "weight_data.db")
         else:
-            # 在PC上使用当前目录
-            db_path = "weight_data.db"
-            Logger.info(f"Database: PC数据库路径 - {db_path}")
-            return db_path
+            return "weight_data.db"
     
     def get_export_path(self, filename):
         """获取导出文件路径"""
