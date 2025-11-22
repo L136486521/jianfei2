@@ -8,7 +8,7 @@ main = main.py
 version = 1.0
 
 # Android 配置
-android.api = 33
+android.api = 34
 android.minapi = 21
 android.targetapi = 33
 android.ndk = 25b
@@ -16,6 +16,7 @@ android.sdk = 33
 android.ndk_api = 21
 android.allow_backup = True
 android.gradle_dependencies = 'com.android.support:support-v4:28.0.0'
+android.build_tools_version = 34.0.0
 
 # 权限配置
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
