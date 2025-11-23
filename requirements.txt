@@ -1,4 +1,17 @@
+# Kivy 核心框架
 kivy==2.1.0
+cython==0.29.33  # Kivy Android构建必需
 
+# Android相关依赖
+android
+pyjnius
+kivy-deps.angle
+kivy-deps.glew
+kivy-deps.sdl2
+
+# 数据处理和分析
 pandas==1.5.3
 openpyxl==3.0.10
+
+# SQLite数据库
+sqlite3-binary  # 用于开发环境的SQLite支持
