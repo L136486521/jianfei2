@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
 
     steps:
     - name: Checkout code
@@ -57,22 +57,59 @@ jobs:
 
     - name: Install required SDK components
       run: |
-        # 安装最新的 Build Tools 和 Platform Tools
+        # 安装与buildozer.spec匹配的SDK组件
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" "platform-tools"
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platform-tools" "platforms;android-31" "ndk;21.4.7075529"
 
     - name: Install Buildozer and dependencies
       run: |
         pip install --upgrade pip
         pip install buildozer==1.5.0 cython==0.29.33
 
+    - name: Prepare Buildozer environment
+      run: |
+        # 确保buildozer.spec文件存在
+        if [ ! -f buildozer.spec ]; then
+          echo "buildozer.spec file not found!"
+          exit 1
+        fi
+        
+        # 设置环境变量
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+        
+        # 初始化buildozer（如果需要）
+        # buildozer init || true
+        
+        # 创建必要的目录
+        mkdir -p bin .buildozer
+        
+        # 为构建过程添加超时时间
+        echo "org.gradle.jvmargs=-Xmx4g" >> .gradle.properties || true
+
     - name: Build APK with Buildozer
       run: |
-        buildozer -v android debug
+        # 使用更保守的内存设置进行构建
+        export GRADLE_OPTS="-Xmx4g -XX:MaxPermSize=512m"
+        
+        # 运行buildozer构建，添加详细日志和错误处理
+        buildozer -v android debug 2>&1 || {
+          echo "Build failed, showing logs..."
+          cat .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/weighttracker/debug/build/outputs/logs/build.log || echo "No build log found"
+          exit 1
+        }
+
+    - name: Check build results
+      run: |
+        # 列出构建结果目录内容，便于调试
+        ls -la bin/ || echo "Bin directory not found"
+        find . -name "*.apk" -type f -exec ls -la {} \;
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: weight-tracker-apk
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/*/debug/*.apk
         retention-days: 30
