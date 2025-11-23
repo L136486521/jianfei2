@@ -14,15 +14,15 @@ source.include_patterns = weighttracker.kv,*.db,*.txt
 main = main.py
 version = 1.0
 
-# Android 配置
-android.api = 33
+# Android 配置 - 更新到匹配工作流的版本
+android.api = 34
 android.minapi = 21
-android.targetapi = 33
-android.sdk_version = 33
+android.targetapi = 34
+android.sdk_version = 34
 android.ndk_api = 21
 android.allow_backup = True
 android.enable_androidx = True
-android.build_tools_version = 33.0.0
+android.build_tools_version = 34.0.0
 
 # 权限配置
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
@@ -35,8 +35,8 @@ presplash.filename = presplash.png
 orientation = portrait
 fullscreen = 0
 
-# 依赖配置 - 进一步简化
-requirements = python3,kivy==2.1.0,android,pyjnius,sqlite3
+# 依赖配置 - 使用更稳定的版本
+requirements = python3,kivy==2.3.0,android,pyjnius==1.5.0,sqlite3
 
 # 优化设置
 android.no_debug_bridge = True
@@ -47,15 +47,9 @@ android.add_src = .
 build_type = debug
 p4a.branch = master
 
-# 强制使用特定的gradle和插件版本
+# 使用更兼容的gradle配置
 android.gradle_plugin = 7.2.0
 android.gradle_version = 7.5
-
-# 删除重复的 android.enable_androidx 和 android.use_androidx 行
-
-# 添加这些配置来解决gradle问题
-android.accept_sdk_license = True
-android.skip_update = False
 
 log_level = 2
 
@@ -63,4 +57,3 @@ log_level = 2
 log_level = 2
 build_dir = .buildozer
 bin_dir = ./bin
-
