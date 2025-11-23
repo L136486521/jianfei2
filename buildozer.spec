@@ -14,13 +14,10 @@ source.include_patterns = weighttracker.kv,*.db,*.txt
 main = main.py
 version = 1.0
 
-# Android 配置 - 更新NDK版本
+# Android 配置
 android.api = 33
 android.minapi = 21
 android.targetapi = 33
-# 删除旧的NDK版本配置，让buildozer自动下载
-# android.ndk_version = 21.4.7075529
-# android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
 android.sdk_version = 33
 android.ndk_api = 21
 android.allow_backup = True
@@ -38,24 +35,30 @@ presplash.filename = presplash.png
 orientation = portrait
 fullscreen = 0
 
-# 依赖配置 - 简化requirements
-requirements = python3,kivy==2.1.0,sqlite3,android,pyjnius
+# 依赖配置 - 进一步简化
+requirements = python3,kivy==2.1.0,android,pyjnius,sqlite3
 
 # 优化设置
 android.no_debug_bridge = True
 android.archs = arm64-v8a,armeabi-v7a
-android.add_libs_armeabi_v7a = libandroid.so,liblog.so,libz.so
-android.add_libs_arm64_v8a = libandroid.so,liblog.so,libz.so
 android.add_src = .
 
 # 构建配置
 build_type = debug
 p4a.branch = master
-# 优化构建参数
-p4a.ignore_javac_version = False
-android.gradle_dependencies = 
+
+# 强制使用特定的gradle和插件版本
 android.gradle_plugin = 7.2.0
 android.gradle_version = 7.5
+
+# 禁用某些可能导致问题的功能
+android.use_androidx = True
+android.enable_androidx = True
+
+# 添加这些配置来解决gradle问题
+android.accept_sdk_license = True
+android.skip_update = False
+
 log_level = 2
 
 [buildozer]
