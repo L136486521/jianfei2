@@ -108,7 +108,7 @@ jobs:
         echo "sdk.dir=$ANDROID_HOME" > local.properties
 
     - name: Build APK with Buildozer (强制构建)
-      continue-on-error: true  # 这是关键：即使构建失败也继续执行
+      continue-on-error: true
       run: |
         # 设置构建环境
         export ANDROID_SDK_ROOT=$ANDROID_HOME
@@ -117,21 +117,31 @@ jobs:
         # 设置详细的构建日志
         export BUILDOZER_BUILD_LOG_LEVEL=2
         
-        # 清理之前的构建
-        buildozer -v android clean
+        # 检查python-for-android目录是否存在，如果不存在则跳过清理
+        if [ -d "/home/runner/work/jianfei2/jianfei2/.buildozer/android/platform/python-for-android" ]; then
+          echo "执行清理操作..."
+          buildozer -v android clean
+        else
+          echo "python-for-android目录不存在，跳过清理步骤"
+        fi
         
         # 尝试构建APK - 使用更详细的输出
+        echo "开始构建APK..."
         buildozer -v android debug 2>&1 | tee build_log.txt || echo "构建过程遇到错误，但继续执行..."
         
         # 检查是否生成了APK文件
         if ls bin/*.apk 2>/dev/null; then
           echo "APK文件已生成"
+          echo "APK文件列表:"
+          ls -la bin/*.apk
         else
           echo "未找到APK文件"
+          echo "检查构建目录内容:"
+          ls -la .buildozer/android/platform/ 2>/dev/null || echo "没有构建目录"
         fi
 
     - name: Upload APK (如果存在)
-      if: success() || failure()  # 无论构建是否成功都尝试上传
+      if: success() || failure()
       uses: actions/upload-artifact@v4
       with:
         name: weight-tracker-apk
