@@ -32,7 +32,8 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git zip unzip openjdk-11-jdk zlib1g-dev libxslt1-dev libxml2-dev expect
+        sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk zlib1g-dev libxslt1-dev libxml2-dev expect
+        echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
 
     # 缓存Android SDK以加速构建
     - name: Cache Android SDK
