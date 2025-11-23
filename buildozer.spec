@@ -64,7 +64,6 @@ p4a.branch = stable
 log_level = 2
 
 # 解决Python线程问题
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,REQUEST_INSTALL_PACKAGES
 android.orientation = portrait
 
 # 内存优化
