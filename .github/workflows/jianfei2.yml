@@ -98,7 +98,7 @@ jobs:
     - name: Install Buildozer
       run: |
         pip install --upgrade pip
-        pip install buildozer==1.6.0 cython==0.29.37
+        pip install buildozer==1.5.0 cython==0.29.33
 
     - name: Configure Buildozer
       run: |
