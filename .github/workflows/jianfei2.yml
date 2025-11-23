@@ -26,7 +26,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-        cache: 'pip'  # 缓存pip依赖
+        cache: 'pip'
         cache-dependency-path: 'requirements.txt'
 
     - name: Install system dependencies
@@ -74,26 +74,24 @@ jobs:
       run: |
         # 简单的许可证接受方式
         echo "Accepting Android licenses..."
+        mkdir -p "$ANDROID_HOME/licenses"
+        echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license"
+        echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
     - name: Install required SDK components
       run: |
-        # 安装必要的SDK组件
+        # 安装必要的SDK组件 - 使用更新的版本
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platform-tools" "platforms;android-31" "ndk;21.4.7075529"
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;33.0.0" "platform-tools" "platforms;android-33" "cmdline-tools;latest"
         
         # 创建Buildozer期望的tools目录结构
         mkdir -p "$ANDROID_HOME/tools/bin"
         ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
         
-        # 确保buildozer能找到SDK组件 - 创建必要的目录结构
+        # 确保buildozer能找到SDK组件
         mkdir -p ~/.buildozer/android/platform
-        # 创建从实际SDK目录到buildozer期望位置的符号链接
         ln -sf "$ANDROID_HOME" ~/.buildozer/android/platform/android-sdk
-        
-        # 验证aidl工具是否存在
-        echo "Verifying aidl tool installation..."
-        find "$ANDROID_HOME/build-tools/31.0.0" -name "aidl" || echo "Warning: aidl not found, but continuing..."
 
     - name: Install Buildozer
       run: |
@@ -102,36 +100,32 @@ jobs:
 
     - name: Configure Buildozer
       run: |
-        # 在GitHub Actions环境中覆盖冲突的NDK相关环境变量
-        # 使用空值覆盖所有可能冲突的NDK路径变量
+        # 清理可能冲突的环境变量
         echo "ANDROID_NDK=" >> $GITHUB_ENV
         echo "ANDROIDNDK=" >> $GITHUB_ENV
         echo "ANDROID_NDK_ROOT=" >> $GITHUB_ENV
         echo "ANDROID_NDK_LATEST_HOME=" >> $GITHUB_ENV
         
-        # 只设置我们需要的环境变量，确保覆盖任何现有值
-        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
+        # 设置正确的环境变量
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
         
-        # 创建必要的配置文件，明确设置NDK和SDK路径
+        # 创建本地配置文件
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-        echo "ndk.dir=$ANDROID_HOME/ndk/21.4.7075529" >> local.properties
         
-        # 验证环境变量设置
-        echo "Using NDK at: $ANDROID_HOME/ndk/21.4.7075529"
-        echo "Using SDK at: $ANDROID_HOME"
+        echo "使用自动NDK下载，不手动设置NDK路径"
 
-    - name: Build APK
+    - name: Build APK with Buildozer
       run: |
-        # 确保在构建步骤中也使用正确的环境变量
-        export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529
+        # 设置构建环境
         export ANDROID_SDK_ROOT=$ANDROID_HOME
-        export GRADLE_OPTS="-Xmx2g"
+        export GRADLE_OPTS="-Xmx2g -Dorg.gradle.daemon=false"
         
-        # 设置构建日志级别，以便更好地调试
+        # 设置详细的构建日志
         export BUILDOZER_BUILD_LOG_LEVEL=2
         
-        # 执行构建命令
+        # 初始化buildozer并构建
+        buildozer init
+        buildozer -v android clean
         buildozer -v android debug
 
     - name: Upload APK
