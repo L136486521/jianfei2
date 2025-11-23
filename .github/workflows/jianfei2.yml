@@ -29,77 +29,10 @@ jobs:
         cache: 'pip'  # 缓存pip依赖
         cache-dependency-path: 'requirements.txt'
 
-    - name: Install system dependencies with error handling
+    - name: Install system dependencies
       run: |
-        # 添加重试机制的辅助函数
-        apt_install_with_retry() {
-          local package_list=$1
-          local max_retries=3
-          local retry_count=0
-          
-          while [ $retry_count -lt $max_retries ]; do
-            echo "Installing packages: $package_list (Attempt $((retry_count + 1))/$max_retries)"
-            if sudo apt-get install -y $package_list; then
-              echo "Successfully installed: $package_list"
-              return 0
-            else
-              echo "Failed to install: $package_list. Retrying in 5 seconds..."
-              retry_count=$((retry_count + 1))
-              sleep 5
-              sudo apt-get update
-            fi
-          done
-          echo "Failed to install: $package_list after $max_retries attempts"
-          return 1
-        }
-        
-        # 确保apt-get配置正确
-        sudo apt-get clean
-        sudo apt-get update || echo "Warning: apt-get update had issues, continuing anyway"
-        
-        # 使用重试机制安装核心依赖
-        core_deps="build-essential git zip unzip openjdk-11-jdk zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev wget curl expect"
-        apt_install_with_retry "$core_deps"
-        
-        # 使用重试机制安装额外的库依赖
-        lib_deps="libxslt1-dev libxml2-dev libjpeg-dev libpng-dev libtiff-dev libfreetype6-dev"
-        apt_install_with_retry "$lib_deps"
-        
-        # 检查关键依赖是否已安装
-        echo "\n=== Dependency Verification ==="
-        critical_deps=("build-essential" "openjdk-11-jdk" "libxslt1-dev" "libxml2-dev")
-        
-        missing_deps=()
-        for dep in "${critical_deps[@]}"; do
-          if ! dpkg -l | grep -q "^ii\s*$dep"; then
-            echo "WARNING: $dep might not be installed correctly"
-            missing_deps+=("$dep")
-          else
-            echo "✓ $dep is installed"
-          fi
-        done
-        
-        # 对于缺失的关键依赖，尝试单独安装
-        if [ ${#missing_deps[@]} -gt 0 ]; then
-          echo "\nAttempting to install missing dependencies individually:"
-          for dep in "${missing_deps[@]}"; do
-            echo "Trying to install $dep..."
-            sudo apt-get install -y "$dep" || echo "Warning: Failed to install $dep"
-          done
-        fi
-        
-        # 再次检查libxslt1-dev，这是之前出错的关键包
-        if dpkg -l | grep -q "^ii\s*libxslt1-dev"; then
-          echo "\n✓ libxslt1-dev is correctly installed - previous error resolved!"
-        else
-          echo "\nWARNING: libxslt1-dev still not found. This may cause build issues."
-        fi
-        
-        # 显示已安装的依赖版本信息
-        echo "\n=== Installed Versions ==="
-        dpkg -l | grep -E 'build-essential|openjdk-11|libxslt1|libxml2' || echo "No version info available"
-        
-        echo "\n=== Dependency installation complete ==="
+        sudo apt-get update
+        sudo apt-get install -y build-essential git zip unzip openjdk-11-jdk zlib1g-dev libxslt1-dev libxml2-dev expect
 
     # 缓存Android SDK以加速构建
     - name: Cache Android SDK
@@ -108,40 +41,29 @@ jobs:
         path: |
           ~/android-sdk
           ~/.buildozer
-        key: ${{ runner.os }}-android-sdk-31.0.0-ndk-21.4.7075529
+        key: ${{ runner.os }}-android-sdk-cache
         restore-keys: |
           ${{ runner.os }}-android-sdk-
-          ${{ runner.os }}-
     
     - name: Set up Android SDK
       run: |
-        # 检查SDK缓存是否存在
+        # 下载和配置SDK
         SDK_DIR="$HOME/android-sdk"
-        if [ ! -d "$SDK_DIR" ]; then
-          echo "Setting up Android SDK from scratch..."
-          mkdir -p "$SDK_DIR"
-          
-          # 下载SDK工具包
-          SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip"
-          wget -q "$SDK_URL" -O "$SDK_DIR/sdk-tools.zip"
-          
-          # 解压SDK工具包
-          unzip -q "$SDK_DIR/sdk-tools.zip" -d "$SDK_DIR"
-        else
-          echo "Using cached Android SDK..."
-        fi
+        mkdir -p "$SDK_DIR"
         
-        # 确保正确的目录结构
+        # 下载SDK工具包
+        SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip"
+        wget -q "$SDK_URL" -O "$SDK_DIR/sdk-tools.zip"
+        
+        # 解压SDK工具包
+        unzip -q "$SDK_DIR/sdk-tools.zip" -d "$SDK_DIR"
+        
+        # 设置目录结构
         mkdir -p "$SDK_DIR/cmdline-tools/latest"
-        if [ -d "$SDK_DIR/cmdline-tools/bin" ]; then
-          mv "$SDK_DIR/cmdline-tools/bin" "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/cmdline-tools/licenses" "$SDK_DIR/cmdline-tools/NOTICE.txt" "$SDK_DIR/cmdline-tools/source.properties" "$SDK_DIR/cmdline-tools/latest/" 2>/dev/null || true
-        fi
+        mv "$SDK_DIR/cmdline-tools/bin" "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/cmdline-tools/licenses" "$SDK_DIR/cmdline-tools/NOTICE.txt" "$SDK_DIR/cmdline-tools/source.properties" "$SDK_DIR/cmdline-tools/latest/" 2>/dev/null || true
         
         # 创建必要的目录
-        mkdir -p "$SDK_DIR/platform-tools"
-        mkdir -p "$SDK_DIR/build-tools"
-        mkdir -p "$SDK_DIR/platforms"
-        mkdir -p "$SDK_DIR/ndk"
+        mkdir -p "$SDK_DIR/platform-tools" "$SDK_DIR/build-tools" "$SDK_DIR/platforms" "$SDK_DIR/ndk"
         
         # 设置环境变量
         echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
@@ -149,241 +71,43 @@ jobs:
 
     - name: Accept Android licenses
       run: |
-        # 使用expect自动接受所有许可证
-        if command -v expect &> /dev/null; then
-          cat > accept_licenses.exp << 'EOF'
-          #!/usr/bin/expect
-          set timeout -1
-          spawn $env(ANDROID_HOME)/cmdline-tools/latest/bin/sdkmanager --licenses
-          expect "Accept? (y/N):" {
-            send "y\r"
-            exp_continue
-          }
-          expect eof
-          EOF
-          chmod +x accept_licenses.exp
-          ./accept_licenses.exp
-        else
-          # 回退方案
-          echo "Accepting licenses with yes command..."
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || echo "License acceptance may have failed, continuing anyway"
-        fi
+        # 简单的许可证接受方式
+        echo "Accepting Android licenses..."
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
     - name: Install required SDK components
       run: |
-        # 安装与buildozer.spec匹配的SDK组件
+        # 安装必要的SDK组件
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platform-tools" "platforms;android-31" "ndk;21.4.7075529"
         
-        # 验证所有SDK组件安装
-        echo "Verifying SDK components installation..."
-        ls -la "$ANDROID_HOME/"
-        ls -la "$ANDROID_HOME/build-tools/"
-        ls -la "$ANDROID_HOME/build-tools/31.0.0/"
-        ls -la "$ANDROID_HOME/ndk/"
-        ls -la "$ANDROID_HOME/ndk/21.4.7075529/"
-        
         # 创建Buildozer期望的tools目录结构
         mkdir -p "$ANDROID_HOME/tools/bin"
-        # 创建sdkmanager的符号链接到旧路径
         ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
-        ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager"
-        
-        # 确保buildozer能找到SDK组件 - 创建必要的符号链接和目录结构
-        mkdir -p ~/.buildozer/android/platform/android-sdk
-        # 复制整个SDK目录而不仅仅是符号链接
-        cp -r "$ANDROID_HOME/build-tools" ~/.buildozer/android/platform/android-sdk/
-        cp -r "$ANDROID_HOME/platform-tools" ~/.buildozer/android/platform/android-sdk/
-        cp -r "$ANDROID_HOME/platforms" ~/.buildozer/android/platform/android-sdk/
-        cp -r "$ANDROID_HOME/ndk" ~/.buildozer/android/platform/android-sdk/
-        mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-        ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-        ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" ~/.buildozer/android/platform/android-sdk/tools/bin/avdmanager
-        
-        # 确保Aidl可执行文件存在并可访问
-        echo "Checking for Aidl executable..."
-        find "$ANDROID_HOME/build-tools/31.0.0" -name "aidl"
 
-    - name: Install Buildozer and dependencies
+    - name: Install Buildozer
       run: |
         pip install --upgrade pip
         pip install buildozer==1.5.0 cython==0.29.33
 
-    - name: Prepare Buildozer environment
+    - name: Configure Buildozer
       run: |
-        # 确保buildozer.spec文件存在
-        if [ ! -f buildozer.spec ]; then
-          echo "buildozer.spec file not found!"
-          exit 1
-        fi
-        
-        # 显示buildozer.spec内容以便调试
-        echo "Contents of buildozer.spec:"
-        cat buildozer.spec
-        
         # 设置环境变量
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-        # 添加SDK工具路径到PATH
-        echo "PATH=$ANDROID_HOME/tools/bin:$PATH" >> $GITHUB_ENV
         
-        # 创建必要的目录结构
-        mkdir -p bin .buildozer ~/.buildozer/android/platform/android-sdk
-        
-        # 确保buildozer使用正确的SDK路径
+        # 创建必要的配置文件
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-        # 创建buildozer.local.properties以覆盖默认路径
-        cat > buildozer.local.properties << 'EOF'
-        android.sdk_path=$ANDROID_HOME
-        android.ndk_path=$ANDROID_HOME/ndk/21.4.7075529
-        EOF
-        
-        # 为构建过程配置更保守的Gradle设置
-        mkdir -p ~/.gradle
-        echo "org.gradle.jvmargs=-Xmx3g -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" > ~/.gradle/gradle.properties
-        echo "org.gradle.parallel=false" >> ~/.gradle/gradle.properties
-        echo "org.gradle.configureondemand=false" >> ~/.gradle/gradle.properties
-        echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
 
-    - name: Build APK with Buildozer
+    - name: Build APK
       run: |
-        # 使用更保守的内存设置进行构建
-        export GRADLE_OPTS="-Xmx3g -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.jvmargs=-Xmx3g"
-        export JAVA_OPTS="-Xmx2g"
-        # 禁用一些可能导致问题的功能以增加构建成功率
-        export ANDROID_SDK_HOME=$ANDROID_HOME
-        export P4A_RELEASE_KEYALIAS=androiddebugkey
-        export P4A_RELEASE_KEYSTORE=$ANDROID_HOME/.android/debug.keystore
-        export P4A_RELEASE_KEYSTORE_PASSWD=android
-        export P4A_RELEASE_KEYALIAS_PASSWD=android
-        
-        # 预先创建python-for-android目录以避免克隆错误
-        mkdir -p .buildozer/android/platform/python-for-android-master
-        
-        # 设置调试模式（根据工作流输入）
-        DEBUG_MODE=${{ github.event.inputs.debug_mode || 'true' }}
-        
-        # 第一次尝试：标准构建
-        echo "=== Attempt 1: Standard build ==="
-        timeout 10800s buildozer -v android debug && echo "Build successful on first attempt!" && exit 0 || echo "First build attempt failed, proceeding with recovery options..."
-        
-        # 错误恢复策略1：清理缓存和重建
-        echo "\n=== Recovery Attempt 1: Clean cache and rebuild ==="
-        buildozer android clean
-        timeout 10800s buildozer -v android debug --clean || echo "Clean rebuild failed, proceeding to next recovery attempt..."
-        
-        # 错误恢复策略2：跳过部分验证和强制构建
-        echo "\n=== Recovery Attempt 2: Force build with validation skip ==="
-        # 修改buildozer.spec以临时跳过一些验证
-        sed -i 's/depends = .*/depends = /g' buildozer.spec || true
-        sed -i 's/requirements = .*/requirements = python3,kivy/g' buildozer.spec || true
-        
-        # 使用更多的强制选项
-        export P4A_FORCE_BUILD=1
-        export P4A_IGNORE_JAVA_VERSION=1
-        timeout 10800s buildozer -v android debug --force --ignore-setup-errors || echo "Force build with validation skip failed..."
-        
-        # 错误恢复策略3：手动构建APK（如果中间文件存在）
-        echo "\n=== Recovery Attempt 3: Manual APK assembly ==="
-        # 检查是否有可用的中间构建文件
-        if [ -d ".buildozer/android/platform/build-arm64-v8a_armeabi-v7a" ]; then
-          echo "Found intermediate build files, attempting manual APK assembly..."
-          # 进入构建目录并尝试Gradle构建
-          cd .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/*/ || echo "Cannot enter build directory"
-          # 尝试直接运行Gradle构建（忽略某些错误）
-          ../gradle/gradle-*/bin/gradle assembleDebug --no-daemon --stacktrace --info -x lint -x check || echo "Manual Gradle build failed..."
-          # 复制生成的APK到项目根目录
-          cp -r build/outputs/apk/debug/*.apk ../../../bin/ 2>/dev/null || echo "Failed to copy APK from manual build"
-          cd - || echo "Failed to return to project root"
-        fi
-        
-        # 错误恢复策略4：使用更简单的配置重新构建
-        echo "\n=== Recovery Attempt 4: Minimal configuration build ==="
-        # 创建最小化配置文件
-        cat > minimal.spec << 'EOF'
-        [app]
-        title = Weight Tracker
-        package.name = weighttracker
-        package.domain = org.example
-        source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas
-        version = 1.0
-        requirements = python3,kivy
-        orientation = portrait
-        osx.python_version = 3
-        osx.kivy_version = 2.0.0
-        fullscreen = 0
-        
-        [buildozer]
-        log_level = 2
-        warn_on_root = 1
-        EOF
-        
-        # 使用最小化配置构建
-        timeout 7200s buildozer -v android debug --spec minimal.spec || echo "Minimal configuration build failed..."
-        
-        # 最后的诊断信息
-        echo "\n=== Final Diagnostics ==="
-        find .buildozer -name "*.log" -type f | sort | while read logfile; do
-          echo "\n=== Log file: $logfile ==="
-          tail -n 50 "$logfile" 2>/dev/null || head -n 50 "$logfile" 2>/dev/null
-        done
-        
-        # 即使构建失败，也尝试找到任何生成的APK文件
-        echo "\n=== Finding any generated APK files ==="
-        mkdir -p bin
-        find . -name "*.apk" -type f | xargs -I {} cp {} bin/ 2>/dev/null || echo "No APK files found for recovery"
-        ls -la bin/ || echo "Bin directory contents listing failed"
-        
-        # 如果找到了APK文件，任务就不算完全失败
-        if [ -n "$(find bin -name "*.apk" -type f 2>/dev/null)" ]; then
-          echo "\n=== SUCCESS: Found APK file(s) despite build errors! ==="
-          exit 0
-        else
-          echo "\n=== FAILURE: No APK files could be generated or recovered ==="
-          # 不退出，允许后续步骤继续尝试上传
-          exit 0
-        }
+        # 简单直接的构建命令
+        export GRADLE_OPTS="-Xmx2g"
+        buildozer -v android debug
 
-    - name: Check build results
-      run: |
-        # 列出构建结果目录内容，便于调试
-        echo "=== Build Results Check ==="
-        mkdir -p bin  # 确保bin目录存在
-        ls -la bin/ || echo "Bin directory contents listing failed"
-        
-        # 查找所有可能的APK文件位置
-        echo "\n=== Finding APK files ==="
-        find . -name "*.apk" -type f -exec ls -la {} \; || echo "No APK files found"
-        
-        # 检查构建日志是否有警告或错误
-        echo "\n=== Checking for build warnings/errors ==="
-        grep -i "error\|warning\|fail" .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/*/build/outputs/apk/debug/output.json 2>/dev/null || echo "No obvious errors in output.json"
-        
-        # 验证APK签名（如果存在）
-        APK_FILE=$(find . -name "*.apk" -type f | head -1)
-        if [ ! -z "$APK_FILE" ]; then
-          echo "\n=== APK Verification ==="
-          echo "Found APK: $APK_FILE"
-          # 显示APK信息
-          unzip -l "$APK_FILE" | grep -E "classes\.dex|AndroidManifest\.xml" || echo "Cannot verify APK contents"
-        fi
-        
-        # 检查是否有生成的APK文件，如果没有则尝试恢复
-        if [ -z "$APK_FILE" ]; then
-          echo "\n=== Attempting to recover APK from intermediate builds ==="
-          # 检查中间构建目录
-          find .buildozer -name "*.apk" -type f -exec cp {} bin/ 2>/dev/null \; || echo "Recovery attempt failed"
-          # 再次检查
-          ls -la bin/ || echo "Bin directory still empty after recovery attempt"
-        fi
-
-    - name: Upload APK artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: weight-tracker-apk
-        path: |
-          bin/*.apk
-          .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/*/debug/*.apk
-        retention-days: 30
+        path: bin/*.apk
+        retention-days: 7
