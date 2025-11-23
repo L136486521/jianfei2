@@ -14,17 +14,18 @@ source.include_patterns = weighttracker.kv,*.db,*.txt
 main = main.py
 version = 1.0
 
-# Android 配置
-android.api = 31
+# Android 配置 - 更新NDK版本
+android.api = 33
 android.minapi = 21
-android.targetapi = 31
-android.ndk_version = 21.4.7075529
-android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
-android.sdk_version = 31
+android.targetapi = 33
+# 删除旧的NDK版本配置，让buildozer自动下载
+# android.ndk_version = 21.4.7075529
+# android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
+android.sdk_version = 33
 android.ndk_api = 21
 android.allow_backup = True
 android.enable_androidx = True
-android.build_tools_version = 31.0.0
+android.build_tools_version = 33.0.0
 
 # 权限配置
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
@@ -37,8 +38,8 @@ presplash.filename = presplash.png
 orientation = portrait
 fullscreen = 0
 
-# 依赖配置
-requirements = python3,kivy==2.1.0,sqlite3,android,pyjnius,cython==0.29.33
+# 依赖配置 - 简化requirements
+requirements = python3,kivy==2.1.0,sqlite3,android,pyjnius
 
 # 优化设置
 android.no_debug_bridge = True
@@ -53,8 +54,8 @@ p4a.branch = master
 # 优化构建参数
 p4a.ignore_javac_version = False
 android.gradle_dependencies = 
-android.gradle_plugin = 4.2.0
-android.gradle_version = 6.7.1
+android.gradle_plugin = 7.2.0
+android.gradle_version = 7.5
 log_level = 2
 
 [buildozer]
