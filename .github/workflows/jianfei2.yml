@@ -102,18 +102,14 @@ jobs:
 
     - name: Configure Buildozer
       run: |
-        # 清理所有可能的NDK相关环境变量，防止冲突
-        unset ANDROID_NDK
-        unset ANDROIDNDK
-        unset ANDROID_NDK_ROOT
-        unset ANDROID_NDK_LATEST_HOME
-        unset ANDROID_SDK_ROOT
+        # 在GitHub Actions环境中覆盖冲突的NDK相关环境变量
+        # 使用空值覆盖所有可能冲突的NDK路径变量
+        echo "ANDROID_NDK=" >> $GITHUB_ENV
+        echo "ANDROIDNDK=" >> $GITHUB_ENV
+        echo "ANDROID_NDK_ROOT=" >> $GITHUB_ENV
+        echo "ANDROID_NDK_LATEST_HOME=" >> $GITHUB_ENV
         
-        # 只设置我们需要的环境变量
-        export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529
-        export ANDROID_SDK_ROOT=$ANDROID_HOME
-        
-        # 将环境变量持久化到GitHub环境
+        # 只设置我们需要的环境变量，确保覆盖任何现有值
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
         
@@ -122,13 +118,20 @@ jobs:
         echo "ndk.dir=$ANDROID_HOME/ndk/21.4.7075529" >> local.properties
         
         # 验证环境变量设置
-        echo "Using NDK at: $ANDROID_NDK_HOME"
-        echo "Using SDK at: $ANDROID_SDK_ROOT"
+        echo "Using NDK at: $ANDROID_HOME/ndk/21.4.7075529"
+        echo "Using SDK at: $ANDROID_HOME"
 
     - name: Build APK
       run: |
-        # 简单直接的构建命令
+        # 确保在构建步骤中也使用正确的环境变量
+        export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529
+        export ANDROID_SDK_ROOT=$ANDROID_HOME
         export GRADLE_OPTS="-Xmx2g"
+        
+        # 设置构建日志级别，以便更好地调试
+        export BUILDOZER_BUILD_LOG_LEVEL=2
+        
+        # 执行构建命令
         buildozer -v android debug
 
     - name: Upload APK
