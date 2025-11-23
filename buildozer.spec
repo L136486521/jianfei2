@@ -28,7 +28,7 @@ android.ndk = 25b
 android.sdk = 33
 android.ndk_api = 21
 android.allow_backup = True
-android.gradle_dependencies = 'com.android.support:support-v4:28.0.0'
+android.gradle_dependencies = 'com.android.support:support-v4:28.0.0', 'org.apache.commons:commons-math3:3.6.1'
 android.build_tools_version = 34.0.0
 
 # 权限配置
@@ -45,7 +45,6 @@ fullscreen = 0
 requirements = python3,kivy==2.1.0,sqlite3,android,pyjnius
 
 # 添加pandas相关依赖，但使用更兼容Android的版本和配置
-android.gradle_dependencies = org.apache.commons:commons-math3:3.6.1
 
 # 减少应用程序大小的设置
 android.no_debug_bridge = True
