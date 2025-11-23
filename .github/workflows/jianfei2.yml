@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
-    # 允许手动触发构建
     inputs:
       debug_mode:
         description: 'Enable debug mode for detailed logs'
@@ -35,7 +34,6 @@ jobs:
         sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk zlib1g-dev libxslt1-dev libxml2-dev expect
         echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
 
-    # 缓存Android SDK以加速构建
     - name: Cache Android SDK
       uses: actions/cache@v3
       with:
@@ -48,7 +46,6 @@ jobs:
     
     - name: Set up Android SDK
       run: |
-        # 下载和配置SDK
         SDK_DIR="$HOME/android-sdk"
         mkdir -p "$SDK_DIR"
         
@@ -72,7 +69,6 @@ jobs:
 
     - name: Accept Android licenses
       run: |
-        # 简单的许可证接受方式
         echo "Accepting Android licenses..."
         mkdir -p "$ANDROID_HOME/licenses"
         echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license"
@@ -81,15 +77,14 @@ jobs:
 
     - name: Install required SDK components
       run: |
-        # 安装必要的SDK组件 - 使用更新的版本
+        # 安装必要的SDK组件
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;33.0.0" "platform-tools" "platforms;android-33" "cmdline-tools;latest"
         
-        # 创建Buildozer期望的tools目录结构
+        # 创建Buildozer期望的目录结构
         mkdir -p "$ANDROID_HOME/tools/bin"
         ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
         
-        # 确保buildozer能找到SDK组件
         mkdir -p ~/.buildozer/android/platform
         ln -sf "$ANDROID_HOME" ~/.buildozer/android/platform/android-sdk
 
@@ -111,10 +106,9 @@ jobs:
         
         # 创建本地配置文件
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-        
-        echo "使用自动NDK下载，不手动设置NDK路径"
 
-    - name: Build APK with Buildozer
+    - name: Build APK with Buildozer (强制构建)
+      continue-on-error: true  # 这是关键：即使构建失败也继续执行
       run: |
         # 设置构建环境
         export ANDROID_SDK_ROOT=$ANDROID_HOME
@@ -123,12 +117,46 @@ jobs:
         # 设置详细的构建日志
         export BUILDOZER_BUILD_LOG_LEVEL=2
         
-        # 初始化buildozer并构建
-        buildozer -v android debug
+        # 清理之前的构建
+        buildozer -v android clean
+        
+        # 尝试构建APK - 使用更详细的输出
+        buildozer -v android debug 2>&1 | tee build_log.txt || echo "构建过程遇到错误，但继续执行..."
+        
+        # 检查是否生成了APK文件
+        if ls bin/*.apk 2>/dev/null; then
+          echo "APK文件已生成"
+        else
+          echo "未找到APK文件"
+        fi
 
-    - name: Upload APK
+    - name: Upload APK (如果存在)
+      if: success() || failure()  # 无论构建是否成功都尝试上传
       uses: actions/upload-artifact@v4
       with:
         name: weight-tracker-apk
         path: bin/*.apk
         retention-days: 7
+
+    - name: Upload build logs (如果构建失败)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          .buildozer/**/*.log
+          build_log.txt
+        retention-days: 7
+
+    - name: Check build status
+      run: |
+        if ls bin/*.apk 2>/dev/null; then
+          echo "✅ APK构建成功"
+          exit 0
+        else
+          echo "❌ APK构建失败"
+          # 显示一些调试信息
+          echo "检查构建目录内容:"
+          ls -la .buildozer/android/platform/build-* 2>/dev/null || echo "没有构建目录"
+          exit 1
+        fi
