@@ -19,6 +19,7 @@ android.api = 31
 android.minapi = 21
 android.targetapi = 31
 android.ndk_version = 21.4.7075529
+android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
 android.sdk_version = 31
 android.ndk_api = 21
 android.allow_backup = True
