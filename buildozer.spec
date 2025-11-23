@@ -25,7 +25,6 @@ android.ndk_version = 21
 # (str) Android SDK version to use
 android.sdk_version = 31
 android.ndk = 25b
-android.sdk = 33
 android.ndk_api = 21
 android.allow_backup = True
 android.gradle_dependencies = 'com.android.support:support-v4:28.0.0', 'org.apache.commons:commons-math3:3.6.1'
@@ -51,7 +50,7 @@ android.no_debug_bridge = True
 android.archs = arm64-v8a,armeabi-v7a
 
 # 确保使用正确的NDK版本
-android.ndk_path = %(android.sdk_path)s/ndk/21.4.7075529
+android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
 
 # 优化打包
 android.add_libs_armeabi_v7a = libandroid.so,liblog.so,libz.so
