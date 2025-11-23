@@ -21,7 +21,7 @@ android.targetapi = 33
 android.sdk_version = 33
 android.ndk_api = 21
 android.allow_backup = True
-android.enable_androidx = True
+android.enable_androidx = True  # 只保留这一行，删除重复的
 android.build_tools_version = 33.0.0
 
 # 权限配置
@@ -51,9 +51,7 @@ p4a.branch = master
 android.gradle_plugin = 7.2.0
 android.gradle_version = 7.5
 
-# 禁用某些可能导致问题的功能
-android.use_androidx = True
-android.enable_androidx = True
+# 删除重复的 android.enable_androidx 和 android.use_androidx 行
 
 # 添加这些配置来解决gradle问题
 android.accept_sdk_license = True
