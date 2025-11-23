@@ -45,7 +45,19 @@ jobs:
         SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip"
         SDK_DIR="$HOME/android-sdk"
         mkdir -p "$SDK_DIR"
-        wget -qO- "$SDK_URL" | tar xvz -C "$SDK_DIR" --strip-components=1
+        
+        # 下载SDK工具包
+        wget -q "$SDK_URL" -O "$SDK_DIR/sdk-tools.zip"
+        
+        # 解压SDK工具包
+        unzip -q "$SDK_DIR/sdk-tools.zip" -d "$SDK_DIR"
+        
+        # 移动命令行工具到正确的目录结构
+        mkdir -p "$SDK_DIR/cmdline-tools/latest"
+        mv "$SDK_DIR/cmdline-tools/bin" "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/cmdline-tools/licenses" "$SDK_DIR/cmdline-tools/NOTICE.txt" "$SDK_DIR/cmdline-tools/source.properties" "$SDK_DIR/cmdline-tools/latest/" || true
+        
+        # 创建platform-tools目录
+        mkdir -p "$SDK_DIR/platform-tools"
         
         # 设置环境变量
         echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
