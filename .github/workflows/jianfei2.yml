@@ -3,153 +3,145 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      debug_mode:
-        description: 'Enable debug mode for detailed logs'
-        required: false
-        default: 'true'
-        type: boolean
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_NDK_VERSION: 25.2.9519653
+    
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-        cache: 'pip'
-        cache-dependency-path: 'requirements.txt'
+        architecture: 'x64'
 
-    - name: Install system dependencies
+    - name: Install and Configure Java 8
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk zlib1g-dev libxslt1-dev libxml2-dev expect
-        echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+        sudo apt-get install -y openjdk-8-jdk
+        
+        JAVA8_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
+        echo "JAVA8_HOME=$JAVA8_HOME" >> $GITHUB_ENV
+        echo "JAVA_HOME=$JAVA8_HOME" >> $GITHUB_ENV
+        echo "PATH=$JAVA8_HOME/bin:$PATH" >> $GITHUB_ENV
+        java -version
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get install -y \
+          git zip unzip \
+          autoconf automake libtool libltdl-dev \
+          pkg-config zlib1g-dev libncurses-dev \
+          cmake libffi-dev libssl-dev \
+          python3-dev python3-venv \
+          libjpeg-dev \
+          gettext autopoint
+        
+    - name: Install Android SDK and NDK
+      run: |
+        sudo mkdir -p $ANDROID_SDK_ROOT
+        sudo chown -R runner:runner $ANDROID_SDK_ROOT
 
-    - name: Cache Android SDK
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/android-sdk
-          ~/.buildozer
-        key: ${{ runner.os }}-android-sdk-cache
-        restore-keys: |
-          ${{ runner.os }}-android-sdk-
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+        unzip -q cmdline-tools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+        mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+        
+        echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        
+        # 接受许可证
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses > /dev/null
+
+        # 安装必要的组件
+        components=(
+          "platform-tools"
+          "build-tools;34.0.0"
+          "platforms;android-34"
+          "ndk;$ANDROID_NDK_VERSION"
+        )
+        
+        for component in "${components[@]}"; do
+          echo "Installing: $component"
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "$component"
+        done
+        
+        ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+        echo "PATH=$ANDROID_NDK_HOME:$PATH" >> $GITHUB_PATH
+        
+        $ANDROID_NDK_HOME/ndk-build --version
+        
+    - name: Fix sdkmanager path for compatibility
+      run: |
+        mkdir -p $ANDROID_SDK_ROOT/tools/bin
+        ln -sf $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager $ANDROID_SDK_ROOT/tools/bin/sdkmanager  
     
-    - name: Set up Android SDK
+    - name: Install Python dependencies
       run: |
-        SDK_DIR="$HOME/android-sdk"
-        mkdir -p "$SDK_DIR"
-        
-        # 下载SDK工具包
-        SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip"
-        wget -q "$SDK_URL" -O "$SDK_DIR/sdk-tools.zip"
-        
-        # 解压SDK工具包
-        unzip -q "$SDK_DIR/sdk-tools.zip" -d "$SDK_DIR"
-        
-        # 设置目录结构
-        mkdir -p "$SDK_DIR/cmdline-tools/latest"
-        mv "$SDK_DIR/cmdline-tools/bin" "$SDK_DIR/cmdline-tools/lib" "$SDK_DIR/cmdline-tools/licenses" "$SDK_DIR/cmdline-tools/NOTICE.txt" "$SDK_DIR/cmdline-tools/source.properties" "$SDK_DIR/cmdline-tools/latest/" 2>/dev/null || true
-        
-        # 创建必要的目录
-        mkdir -p "$SDK_DIR/platform-tools" "$SDK_DIR/build-tools" "$SDK_DIR/platforms" "$SDK_DIR/ndk"
-        
-        # 设置环境变量
-        echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
-        echo "PATH=$SDK_DIR/cmdline-tools/latest/bin:$SDK_DIR/platform-tools:$PATH" >> $GITHUB_ENV
-
-    - name: Accept Android licenses
+        python -m pip install --upgrade pip
+        pip install "sh>=1.10,<2.0"
+        pip install --upgrade buildozer python-for-android
+        pip install cython==0.29.36 virtualenv kivy==2.3.0 pyjnius==1.5.0 pyopenssl==23.3.0 pillow==10.3.0
+    
+    - name: Set p4a source directory
       run: |
-        echo "Accepting Android licenses..."
-        mkdir -p "$ANDROID_HOME/licenses"
-        echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license"
-        echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
-    - name: Install required SDK components
-      run: |
-        # 安装必要的SDK组件
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;33.0.0" "platform-tools" "platforms;android-33" "cmdline-tools;latest"
-        
-        # 创建Buildozer期望的目录结构
-        mkdir -p "$ANDROID_HOME/tools/bin"
-        ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
-        
-        mkdir -p ~/.buildozer/android/platform
-        ln -sf "$ANDROID_HOME" ~/.buildozer/android/platform/android-sdk
-
-    - name: Install Buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer==1.5.0 cython==0.29.33
-
-    - name: Configure Buildozer
-      run: |
-        # 清理可能冲突的环境变量
-        echo "ANDROID_NDK=" >> $GITHUB_ENV
-        echo "ANDROIDNDK=" >> $GITHUB_ENV
-        echo "ANDROID_NDK_ROOT=" >> $GITHUB_ENV
-        echo "ANDROID_NDK_LATEST_HOME=" >> $GITHUB_ENV
-        
-        # 设置正确的环境变量
-        echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-        
-        # 创建本地配置文件
-        echo "sdk.dir=$ANDROID_HOME" > local.properties
-
+        echo "P4A_LOCAL_DIR=${{ github.workspace }}/.buildozer/android/platform/python-for-android" >> $GITHUB_ENV
+    
     - name: Build APK with Buildozer (强制构建)
       continue-on-error: true
       run: |
-        # 设置构建环境
-        export ANDROID_SDK_ROOT=$ANDROID_HOME
-        export GRADLE_OPTS="-Xmx2g -Dorg.gradle.daemon=false"
+        export _JAVA_OPTIONS="-Xmx4096m -XX:MaxRAMPercentage=75"
+        export CPPFLAGS="-Wno-error"
+        export CFLAGS="-Wno-error"
+        export CXXFLAGS="-Wno-error"
+        export ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+        export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+    
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+        echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+        echo "P4A_LOCAL_DIR=$P4A_LOCAL_DIR"
+    
+        # 清理构建（可选，如果首次构建可以注释掉）
+        # buildozer -v android clean
+    
+        # 强制构建APK
+        buildozer -v android debug \
+          --sdk_path $ANDROID_SDK_ROOT \
+          --ndk_path $ANDROID_NDK_HOME \
+          --log_level=2 \
+          --p4a-source-dir $P4A_LOCAL_DIR 2>&1 | tee build_log.txt || echo "构建过程遇到错误，但继续执行..."
         
-        # 设置详细的构建日志
-        export BUILDOZER_BUILD_LOG_LEVEL=2
-        
-        # 检查python-for-android目录是否存在，如果不存在则跳过清理
-        if [ -d "/home/runner/work/jianfei2/jianfei2/.buildozer/android/platform/python-for-android" ]; then
-          echo "执行清理操作..."
-          buildozer -v android clean
-        else
-          echo "python-for-android目录不存在，跳过清理步骤"
-        fi
-        
-        # 尝试构建APK - 使用更详细的输出
-        echo "开始构建APK..."
-        buildozer -v android debug 2>&1 | tee build_log.txt || echo "构建过程遇到错误，但继续执行..."
-        
-        # 检查是否生成了APK文件
+        # 检查APK是否生成
         if ls bin/*.apk 2>/dev/null; then
-          echo "APK文件已生成"
+          echo "✅ APK文件已生成"
           echo "APK文件列表:"
           ls -la bin/*.apk
         else
-          echo "未找到APK文件"
-          echo "检查构建目录内容:"
-          ls -la .buildozer/android/platform/ 2>/dev/null || echo "没有构建目录"
+          echo "❌ 未找到APK文件"
+          echo "构建目录内容:"
+          ls -la .buildozer/ 2>/dev/null || echo "没有.buildozer目录"
         fi
-
-    - name: Upload APK (如果存在)
-      if: success() || failure()
+        
+    - name: Upload APK artifact
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: weight-tracker-apk
-        path: bin/*.apk
+        path: "bin/*.apk"
+        if-no-files-found: ignore
         retention-days: 7
 
-    - name: Upload build logs (如果构建失败)
-      if: failure()
+    - name: Upload build logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: build-logs
@@ -158,15 +150,17 @@ jobs:
           build_log.txt
         retention-days: 7
 
-    - name: Check build status
+    - name: Check final build status
+      if: always()
       run: |
         if ls bin/*.apk 2>/dev/null; then
-          echo "✅ APK构建成功"
+          echo "🎉 APK构建成功！"
+          echo "生成的APK文件:"
+          ls -la bin/*.apk
           exit 0
         else
-          echo "❌ APK构建失败"
-          # 显示一些调试信息
-          echo "检查构建目录内容:"
-          ls -la .buildozer/android/platform/build-* 2>/dev/null || echo "没有构建目录"
+          echo "💥 APK构建失败"
+          echo "请检查构建日志获取详细信息"
+          # 这里我们故意退出失败，但之前已经上传了日志
           exit 1
         fi
