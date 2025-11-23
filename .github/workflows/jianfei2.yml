@@ -84,6 +84,15 @@ jobs:
         # 创建Buildozer期望的tools目录结构
         mkdir -p "$ANDROID_HOME/tools/bin"
         ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
+        
+        # 确保buildozer能找到SDK组件 - 创建必要的目录结构
+        mkdir -p ~/.buildozer/android/platform
+        # 创建从实际SDK目录到buildozer期望位置的符号链接
+        ln -sf "$ANDROID_HOME" ~/.buildozer/android/platform/android-sdk
+        
+        # 验证aidl工具是否存在
+        echo "Verifying aidl tool installation..."
+        find "$ANDROID_HOME/build-tools/31.0.0" -name "aidl" || echo "Warning: aidl not found, but continuing..."
 
     - name: Install Buildozer
       run: |
