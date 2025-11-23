@@ -48,7 +48,12 @@ android.add_src = .
 
 # 构建配置
 build_type = debug
-p4a.branch = master
+p4a.branch = stable
+# 优化构建参数
+p4a.ignore_javac_version = False
+android.gradle_dependencies = 
+android.gradle_plugin = 4.2.0
+android.gradle_version = 6.7.1
 log_level = 2
 
 [buildozer]
