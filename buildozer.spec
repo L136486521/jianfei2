@@ -22,7 +22,7 @@ android.ndk_version = 21.4.7075529
 android.sdk_version = 31
 android.ndk_api = 21
 android.allow_backup = True
-android.gradle_dependencies = com.android.support:support-v4:28.0.0, org.apache.commons:commons-math3:3.6.1
+android.enable_androidx = True
 android.build_tools_version = 31.0.0
 
 # 权限配置
@@ -48,7 +48,7 @@ android.add_src = .
 
 # 构建配置
 build_type = debug
-p4a.branch = master
+p4a.branch = stable
 log_level = 2
 
 [buildozer]
