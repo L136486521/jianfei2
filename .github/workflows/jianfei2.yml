@@ -73,16 +73,24 @@ jobs:
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platform-tools" "platforms;android-31" "ndk;21.4.7075529"
         
-        # 验证build-tools安装
-        echo "Verifying build-tools installation..."
+        # 验证所有SDK组件安装
+        echo "Verifying SDK components installation..."
+        ls -la "$ANDROID_HOME/"
+        ls -la "$ANDROID_HOME/build-tools/"
         ls -la "$ANDROID_HOME/build-tools/31.0.0/"
+        ls -la "$ANDROID_HOME/ndk/"
+        ls -la "$ANDROID_HOME/ndk/21.4.7075529/"
         
-        # 确保buildozer能找到build-tools - 创建必要的符号链接
+        # 确保buildozer能找到SDK组件 - 创建必要的符号链接和目录结构
         mkdir -p ~/.buildozer/android/platform/android-sdk
-        ln -s "$ANDROID_HOME/build-tools" ~/.buildozer/android/platform/android-sdk/ || true
-        ln -s "$ANDROID_HOME/platform-tools" ~/.buildozer/android/platform/android-sdk/ || true
-        ln -s "$ANDROID_HOME/platforms" ~/.buildozer/android/platform/android-sdk/ || true
-        ln -s "$ANDROID_HOME/ndk" ~/.buildozer/android/platform/android-sdk/ || true
+        ln -sf "$ANDROID_HOME/build-tools" ~/.buildozer/android/platform/android-sdk/
+        ln -sf "$ANDROID_HOME/platform-tools" ~/.buildozer/android/platform/android-sdk/
+        ln -sf "$ANDROID_HOME/platforms" ~/.buildozer/android/platform/android-sdk/
+        ln -sf "$ANDROID_HOME/ndk" ~/.buildozer/android/platform/android-sdk/
+        
+        # 确保Aidl可执行文件存在并可访问
+        echo "Checking for Aidl executable..."
+        find "$ANDROID_HOME/build-tools/31.0.0" -name "aidl"
 
     - name: Install Buildozer and dependencies
       run: |
@@ -97,32 +105,42 @@ jobs:
           exit 1
         fi
         
+        # 显示buildozer.spec内容以便调试
+        echo "Contents of buildozer.spec:"
+        cat buildozer.spec
+        
         # 设置环境变量
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
         echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
         
-        # 初始化buildozer（如果需要）
-        # buildozer init || true
-        
-        # 创建必要的目录
+        # 创建必要的目录结构
         mkdir -p bin .buildozer ~/.buildozer/android/platform/android-sdk
         
         # 确保buildozer使用正确的SDK路径
         echo "sdk.dir=$ANDROID_HOME" > local.properties
         
-        # 为构建过程添加超时时间
-        echo "org.gradle.jvmargs=-Xmx4g" >> .gradle.properties || true
+        # 为构建过程配置更保守的Gradle设置
+        mkdir -p ~/.gradle
+        echo "org.gradle.jvmargs=-Xmx3g -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" > ~/.gradle/gradle.properties
+        echo "org.gradle.parallel=false" >> ~/.gradle/gradle.properties
+        echo "org.gradle.configureondemand=false" >> ~/.gradle/gradle.properties
 
     - name: Build APK with Buildozer
       run: |
         # 使用更保守的内存设置进行构建
-        export GRADLE_OPTS="-Xmx4g -XX:MaxPermSize=512m"
+        export GRADLE_OPTS="-Xmx3g -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.jvmargs=-Xmx3g"
+        export JAVA_OPTS="-Xmx2g"
         
-        # 运行buildozer构建，添加详细日志和错误处理
-        buildozer -v android debug 2>&1 || {
-          echo "Build failed, showing logs..."
-          cat .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/weighttracker/debug/build/outputs/logs/build.log || echo "No build log found"
+        # 设置超时时间为3小时
+        timeout 10800s buildozer -v android debug || {
+          echo "Build failed or timed out, showing available logs..."
+          # 查找并显示所有可用的日志文件
+          find .buildozer -name "*.log" -type f | xargs cat 2>/dev/null || echo "No log files found"
+          # 检查buildozer目录结构
+          ls -la .buildozer/
+          # 查找可能的错误信息
+          cat .buildozer/android/platform/python-for-android-master/logs/main.log 2>/dev/null || echo "Main log not found"
           exit 1
         }
 
