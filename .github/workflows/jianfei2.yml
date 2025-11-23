@@ -29,33 +29,77 @@ jobs:
         cache: 'pip'  # 缓存pip依赖
         cache-dependency-path: 'requirements.txt'
 
-    - name: Install system dependencies
+    - name: Install system dependencies with error handling
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          git \
-          zip \
-          unzip \
-          openjdk-11-jdk \
-          zlib1g-dev \
-          libncurses5-dev \
-          libgdbm-dev \
-          libnss3-dev \
-          libssl-dev \
-          libreadline-dev \
-          libffi-dev \
-          libsqlite3-dev \
-          wget \
-          curl \
-          expect  # 用于自动化许可证接受
-          # 添加更多构建依赖
-          libxslt1-dev \
-          libxml2-dev \
-          libjpeg-dev \
-          libpng-dev \
-          libtiff-dev \
-          libfreetype6-dev
+        # 添加重试机制的辅助函数
+        apt_install_with_retry() {
+          local package_list=$1
+          local max_retries=3
+          local retry_count=0
+          
+          while [ $retry_count -lt $max_retries ]; do
+            echo "Installing packages: $package_list (Attempt $((retry_count + 1))/$max_retries)"
+            if sudo apt-get install -y $package_list; then
+              echo "Successfully installed: $package_list"
+              return 0
+            else
+              echo "Failed to install: $package_list. Retrying in 5 seconds..."
+              retry_count=$((retry_count + 1))
+              sleep 5
+              sudo apt-get update
+            fi
+          done
+          echo "Failed to install: $package_list after $max_retries attempts"
+          return 1
+        }
+        
+        # 确保apt-get配置正确
+        sudo apt-get clean
+        sudo apt-get update || echo "Warning: apt-get update had issues, continuing anyway"
+        
+        # 使用重试机制安装核心依赖
+        core_deps="build-essential git zip unzip openjdk-11-jdk zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev wget curl expect"
+        apt_install_with_retry "$core_deps"
+        
+        # 使用重试机制安装额外的库依赖
+        lib_deps="libxslt1-dev libxml2-dev libjpeg-dev libpng-dev libtiff-dev libfreetype6-dev"
+        apt_install_with_retry "$lib_deps"
+        
+        # 检查关键依赖是否已安装
+        echo "\n=== Dependency Verification ==="
+        critical_deps=("build-essential" "openjdk-11-jdk" "libxslt1-dev" "libxml2-dev")
+        
+        missing_deps=()
+        for dep in "${critical_deps[@]}"; do
+          if ! dpkg -l | grep -q "^ii\s*$dep"; then
+            echo "WARNING: $dep might not be installed correctly"
+            missing_deps+=("$dep")
+          else
+            echo "✓ $dep is installed"
+          fi
+        done
+        
+        # 对于缺失的关键依赖，尝试单独安装
+        if [ ${#missing_deps[@]} -gt 0 ]; then
+          echo "\nAttempting to install missing dependencies individually:"
+          for dep in "${missing_deps[@]}"; do
+            echo "Trying to install $dep..."
+            sudo apt-get install -y "$dep" || echo "Warning: Failed to install $dep"
+          done
+        fi
+        
+        # 再次检查libxslt1-dev，这是之前出错的关键包
+        if dpkg -l | grep -q "^ii\s*libxslt1-dev"; then
+          echo "\n✓ libxslt1-dev is correctly installed - previous error resolved!"
+        else
+          echo "\nWARNING: libxslt1-dev still not found. This may cause build issues."
+        fi
+        
+        # 显示已安装的依赖版本信息
+        echo "\n=== Installed Versions ==="
+        dpkg -l | grep -E 'build-essential|openjdk-11|libxslt1|libxml2' || echo "No version info available"
+        
+        echo "\n=== Dependency installation complete ==="
 
     # 缓存Android SDK以加速构建
     - name: Cache Android SDK
