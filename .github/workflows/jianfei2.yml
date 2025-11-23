@@ -124,8 +124,6 @@ jobs:
         export BUILDOZER_BUILD_LOG_LEVEL=2
         
         # 初始化buildozer并构建
-        buildozer init
-        buildozer -v android clean
         buildozer -v android debug
 
     - name: Upload APK
