@@ -48,7 +48,7 @@ android.add_src = .
 
 # 构建配置
 build_type = debug
-p4a.branch = stable
+p4a.branch = master
 # 优化构建参数
 p4a.ignore_javac_version = False
 android.gradle_dependencies = 
