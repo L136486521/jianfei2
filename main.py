@@ -81,20 +81,30 @@ class SimpleChart(Widget):
         
     def set_data(self, data_points, labels=None):
         """设置图表数据"""
+        # 确保data_points是列表类型
+        if not isinstance(data_points, list):
+            data_points = []
+            
         self.data_points = data_points
         self.labels = labels if labels else [str(i+1) for i in range(len(data_points))]
         
         if data_points:
-            self.min_value = min(data_points)
-            self.max_value = max(data_points)
-            
-            value_range = self.max_value - self.min_value
-            if value_range > 0:
-                self.min_value -= value_range * 0.1
-                self.max_value += value_range * 0.1
-            else:
-                self.min_value -= 10
-                self.max_value += 10
+            try:
+                self.min_value = min(data_points)
+                self.max_value = max(data_points)
+                
+                value_range = self.max_value - self.min_value
+                if value_range > 0:
+                    self.min_value -= value_range * 0.1
+                    self.max_value += value_range * 0.1
+                else:
+                    # 当所有值相同时，设置合理的范围
+                    self.min_value -= 10
+                    self.max_value += 10
+            except (ValueError, TypeError):
+                # 如果计算最小值或最大值出错，设置默认值
+                self.min_value = 0
+                self.max_value = 100
         else:
             self.min_value = 0
             self.max_value = 100
@@ -172,19 +182,21 @@ class SimpleChart(Widget):
         margin_top = dp(50)
         margin_right = dp(40)
         
-        chart_width = self.width - margin_left - margin_right
-        chart_height = self.height - margin_bottom - margin_top
+        chart_width = max(1, self.width - margin_left - margin_right)
+        chart_height = max(1, self.height - margin_bottom - margin_top)
         
         points = []
         num_points = len(self.data_points)
         
         for i, value in enumerate(self.data_points):
             if num_points > 1:
-                x = margin_left + (chart_width / (num_points - 1)) * i
+                # 避免除零错误
+                x = margin_left + (chart_width / max(1, num_points - 1)) * i
             else:
                 x = margin_left + chart_width * 0.5
             
             value_range = self.max_value - self.min_value
+            # 防止除零错误，为value_range设置默认值
             if value_range > 0:
                 y = margin_bottom + ((value - self.min_value) / value_range) * chart_height
             else:
@@ -219,33 +231,66 @@ class WeightDatabase:
         self.db_path = self.get_db_path()
     
     def get_db_path(self):
-        if platform == 'android':
-            from android.storage import app_storage_path
-            return os.path.join(app_storage_path, "weight_data.db")
-        else:
-            return "weight_data.db"
+        try:
+            if IS_ANDROID:
+                from android.storage import app_storage_path
+                try:
+                    # 使用推荐的应用存储路径
+                    app_dir = app_storage_path()
+                    db_path = os.path.join(app_dir, "weight_data.db")
+                    Logger.info(f"Database: 使用Android存储路径 - {db_path}")
+                    return db_path
+                except Exception as e:
+                    # 备选方案
+                    Logger.warning(f"获取app_storage_path失败: {str(e)}")
+                    if self.app and hasattr(self.app, 'user_data_dir'):
+                        return os.path.join(self.app.user_data_dir, "weight_data.db")
+                    else:
+                        return ":memory:"  # 使用内存数据库作为最后备选
+            else:
+                return "weight_data.db"
+        except Exception as e:
+            Logger.error(f"获取数据库路径失败: {str(e)}")
+            return ":memory:"
     
     def get_export_path(self, filename):
         """获取导出文件路径"""
         if IS_ANDROID:
             try:
-                from kivy.app import App
-                app = App.get_running_app()
-                if app:
-                    base_dir = app.user_data_dir
+                # 优先使用应用的user_data_dir
+                if self.app and hasattr(self.app, 'user_data_dir'):
+                    base_dir = self.app.user_data_dir
+                elif hasattr(self, 'app') and self.app:
+                    base_dir = self.app.user_data_dir
                 else:
-                    base_dir = "/data/data/org.example.weighttracker/files/app"
+                    try:
+                        from android.storage import app_storage_path
+                        base_dir = app_storage_path()
+                    except:
+                        base_dir = "/data/user/0/org.example.weighttracker/files"  # 更通用的Android路径
                 
-                export_dir = os.path.join(base_dir, "exports")
-                if not os.path.exists(export_dir):
-                    os.makedirs(export_dir)
-                
-                export_path = os.path.join(export_dir, filename)
-                Logger.info(f"Database: 导出路径 - {export_path}")
-                return export_path
-                
+                # 确保目录存在，处理可能的权限问题
+                try:
+                    export_dir = os.path.join(base_dir, "exports")
+                    if not os.path.exists(export_dir):
+                        os.makedirs(export_dir)
+                    
+                    export_path = os.path.join(export_dir, filename)
+                    Logger.info(f"Database: 导出路径 - {export_path}")
+                    return export_path
+                except PermissionError as e:
+                    Logger.error(f"Database: 权限错误，无法创建导出目录 - {str(e)}")
+                    # 如果无法创建目录，直接返回文件名
+                    return os.path.join(base_dir, filename)
+                    
             except Exception as e:
                 Logger.error(f"Database: 获取导出路径失败 - {str(e)}")
+                # 作为最后备选，尝试直接返回文件名
+                try:
+                    if self.app and hasattr(self.app, 'user_data_dir'):
+                        return os.path.join(self.app.user_data_dir, filename)
+                except:
+                    pass
                 return filename
         else:
             return filename
@@ -1475,25 +1520,36 @@ if __name__ == '__main__':
         
         # 在Android上创建日志文件
         if IS_ANDROID:
-            log_path = "/data/data/org.example.weighttracker/files/app_log.txt"
-            log_dir = os.path.dirname(log_path)
-            if not os.path.exists(log_dir):
-                os.makedirs(log_dir)
-            
-            # 添加文件处理器
-            file_handler = logging.FileHandler(log_path)
-            file_handler.setLevel(logging.INFO)
-            Logger.addHandler(file_handler)
+            try:
+                from android.storage import app_storage_path
+                app_dir = app_storage_path()
+                log_path = os.path.join(app_dir, "app_log.txt")
+                log_dir = os.path.dirname(log_path)
+                if not os.path.exists(log_dir):
+                    os.makedirs(log_dir)
+                
+                # 添加文件处理器
+                file_handler = logging.FileHandler(log_path)
+                file_handler.setLevel(logging.INFO)
+                Logger.addHandler(file_handler)
+            except Exception as e:
+                Logger.warning(f"无法创建日志文件: {str(e)}")
         
         Logger.info("App: 开始启动应用")
-        WeightTrackerApp().run()
-        
+        # 确保WeightTrackerApp类已定义
+        if 'WeightTrackerApp' in globals():
+            WeightTrackerApp().run()
+        else:
+            raise NameError("WeightTrackerApp类未定义")
+            
     except Exception as e:
         Logger.error(f"App: 应用启动失败 - {str(e)}")
         # 在Android上写入错误日志
         if IS_ANDROID:
             try:
-                error_log_path = "/data/data/org.example.weighttracker/files/error_log.txt"
+                from android.storage import app_storage_path
+                app_dir = app_storage_path()
+                error_log_path = os.path.join(app_dir, "error_log.txt")
                 with open(error_log_path, "w") as f:
                     f.write(f"应用启动失败: {str(e)}\n")
                     import traceback
