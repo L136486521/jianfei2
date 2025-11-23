@@ -72,6 +72,17 @@ jobs:
         # 安装与buildozer.spec匹配的SDK组件
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;31.0.0" "platform-tools" "platforms;android-31" "ndk;21.4.7075529"
+        
+        # 验证build-tools安装
+        echo "Verifying build-tools installation..."
+        ls -la "$ANDROID_HOME/build-tools/31.0.0/"
+        
+        # 确保buildozer能找到build-tools - 创建必要的符号链接
+        mkdir -p ~/.buildozer/android/platform/android-sdk
+        ln -s "$ANDROID_HOME/build-tools" ~/.buildozer/android/platform/android-sdk/ || true
+        ln -s "$ANDROID_HOME/platform-tools" ~/.buildozer/android/platform/android-sdk/ || true
+        ln -s "$ANDROID_HOME/platforms" ~/.buildozer/android/platform/android-sdk/ || true
+        ln -s "$ANDROID_HOME/ndk" ~/.buildozer/android/platform/android-sdk/ || true
 
     - name: Install Buildozer and dependencies
       run: |
@@ -89,12 +100,16 @@ jobs:
         # 设置环境变量
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
         
         # 初始化buildozer（如果需要）
         # buildozer init || true
         
         # 创建必要的目录
-        mkdir -p bin .buildozer
+        mkdir -p bin .buildozer ~/.buildozer/android/platform/android-sdk
+        
+        # 确保buildozer使用正确的SDK路径
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
         
         # 为构建过程添加超时时间
         echo "org.gradle.jvmargs=-Xmx4g" >> .gradle.properties || true
