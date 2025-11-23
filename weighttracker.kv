@@ -1,0 +1,225 @@
+#:kivy 2.1.0
+
+<WeightTrackerApp>:
+    title: '减肥体重记录器'
+    icon: 'icon.png'
+    
+    BoxLayout:
+        orientation: 'vertical'
+        
+        # 顶部标题栏
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.1
+            background_color: 0.1, 0.5, 0.8, 1
+            
+            Label:
+                text: '减肥体重记录器'
+                font_size: '20sp'
+                color: 1, 1, 1, 1
+                halign: 'center'
+                valign: 'middle'
+                text_size: self.size
+            
+        # 主界面切换
+        ScreenManager:
+            id: screen_manager
+            
+            # 主界面 - 数据记录和显示
+            Screen:
+                name: 'main'
+                
+                GridLayout:
+                    cols: 1
+                    padding: 10
+                    spacing: 10
+                    
+                    # 体重记录表单
+                    BoxLayout:
+                        orientation: 'vertical'
+                        padding: 10
+                        spacing: 10
+                        background_color: 0.9, 0.9, 0.9, 1
+                        
+                        Label:
+                            text: '记录今日体重'
+                            font_size: '18sp'
+                            bold: True
+                        
+                        GridLayout:
+                            cols: 2
+                            spacing: 10
+                            
+                            Label:
+                                text: '日期:'
+                                halign: 'right'
+                                valign: 'middle'
+                            
+                            TextInput:
+                                id: date_input
+                                multiline: False
+                                font_size: '16sp'
+                        
+                        GridLayout:
+                            cols: 2
+                            spacing: 10
+                            
+                            Label:
+                                text: '体重 (kg):'
+                                halign: 'right'
+                                valign: 'middle'
+                            
+                            TextInput:
+                                id: weight_input
+                                multiline: False
+                                input_type: 'number'
+                                font_size: '16sp'
+                        
+                        GridLayout:
+                            cols: 2
+                            spacing: 10
+                            
+                            Label:
+                                text: '日记:'
+                                halign: 'right'
+                                valign: 'top'
+                            
+                            TextInput:
+                                id: diary_input
+                                multiline: True
+                                font_size: '16sp'
+                                size_hint_y: 3
+                        
+                        Button:
+                            text: '保存记录'
+                            background_color: 0.2, 0.6, 0.9, 1
+                            font_size: '16sp'
+                            on_release: app.save_weight_record()
+                    
+                    # 最近记录显示
+                    BoxLayout:
+                        orientation: 'vertical'
+                        padding: 10
+                        spacing: 10
+                        background_color: 0.95, 0.95, 0.95, 1
+                        
+                        Label:
+                            text: '最近记录'
+                            font_size: '18sp'
+                            bold: True
+                        
+                        ScrollView:
+                            id: recent_records_scroll
+                            
+                            RecycleView:
+                                id: recent_records
+                                viewclass: 'RecordRow'
+                                data: app.get_recent_records()
+                                do_scroll_y: True
+                                
+                                RecycleBoxLayout:
+                                    default_size: None, dp(80)
+                                    default_size_hint: 1, None
+                                    size_hint_y: None
+                                    height: self.minimum_height
+                                    orientation: 'vertical'
+                                    spacing: dp(5)
+                    
+                    # 底部按钮栏
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        spacing: 10
+                        
+                        Button:
+                            text: '导入数据'
+                            background_color: 0.2, 0.8, 0.4, 1
+                            font_size: '16sp'
+                            on_release: app.import_data()
+                        
+                        Button:
+                            text: '导出数据'
+                            background_color: 0.2, 0.8, 0.4, 1
+                            font_size: '16sp'
+                            on_release: app.export_data()
+                        
+                        Button:
+                            text: '数据统计'
+                            background_color: 0.9, 0.6, 0.2, 1
+                            font_size: '16sp'
+                            on_release: screen_manager.current = 'statistics'
+            
+            # 统计界面
+            Screen:
+                name: 'statistics'
+                
+                BoxLayout:
+                    orientation: 'vertical'
+                    padding: 10
+                    spacing: 10
+                    
+                    Button:
+                        text: '返回主界面'
+                        size_hint_y: 0.1
+                        background_color: 0.9, 0.6, 0.2, 1
+                        on_release: screen_manager.current = 'main'
+                    
+                    Label:
+                        text: '体重统计数据'
+                        font_size: '20sp'
+                        bold: True
+                        size_hint_y: 0.1
+                    
+                    BoxLayout:
+                        orientation: 'vertical'
+                        padding: 10
+                        spacing: 10
+                        background_color: 0.95, 0.95, 0.95, 1
+                        size_hint_y: 0.8
+                        
+                        # 统计结果将在这里显示
+                        Label:
+                            id: statistics_label
+                            text: '加载统计数据中...'
+                            font_size: '16sp'
+                            halign: 'left'
+                            valign: 'top'
+                            text_size: self.size
+                            on_texture_size: self.text_size = self.size
+
+<RecordRow@BoxLayout>:
+    orientation: 'vertical'
+    padding: 10
+    background_color: 0.9, 0.9, 0.9, 1
+    
+    BoxLayout:
+        orientation: 'horizontal'
+        
+        Label:
+            text: root.date
+            font_size: '16sp'
+            bold: True
+            size_hint_x: 0.4
+        
+        Label:
+            text: root.weight + ' kg'
+            font_size: '16sp'
+            bold: True
+            color: 0.2, 0.6, 0.9, 1
+            size_hint_x: 0.3
+        
+        Button:
+            text: '删除'
+            size_hint_x: 0.3
+            background_color: 0.9, 0.3, 0.3, 1
+            font_size: '14sp'
+            on_release: app.delete_record(root.record_id)
+    
+    Label:
+        text: root.diary
+        font_size: '14sp'
+        halign: 'left'
+        valign: 'top'
+        text_size: self.size
+        text_truncate: 'middle'
+        size_hint_y: None
+        height: dp(40)
