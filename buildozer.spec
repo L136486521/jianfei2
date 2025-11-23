@@ -48,7 +48,10 @@ requirements = python3,kivy==2.1.0,sqlite3,android,pyjnius
 
 # 减少应用程序大小的设置
 android.no_debug_bridge = True
-android.arch = arm64-v8a,armeabi-v7a
+android.archs = arm64-v8a,armeabi-v7a
+
+# 确保使用正确的NDK版本
+android.ndk_path = %(android.sdk_path)s/ndk/21.4.7075529
 
 # 优化打包
 android.add_libs_armeabi_v7a = libandroid.so,liblog.so,libz.so
