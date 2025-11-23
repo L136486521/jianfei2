@@ -21,7 +21,7 @@ android.targetapi = 33
 android.sdk_version = 33
 android.ndk_api = 21
 android.allow_backup = True
-android.enable_androidx = True  # 只保留这一行，删除重复的
+android.enable_androidx = True
 android.build_tools_version = 33.0.0
 
 # 权限配置
@@ -63,3 +63,4 @@ log_level = 2
 log_level = 2
 build_dir = .buildozer
 bin_dir = ./bin
+
