@@ -36,86 +36,68 @@ jobs:
 
     - name: Set up Android SDK directly
       run: |
-        # 设置SDK路径
-        export ANDROID_HOME="$HOME/android-sdk"
-        mkdir -p "$ANDROID_HOME"
+        # 设置SDK路径 - 使用系统已安装的SDK
+        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        export ANDROID_SDK_ROOT="$ANDROID_HOME"
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
-        
-        # 下载并安装SDK命令行工具
-        cd "$ANDROID_HOME"
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk-tools.zip
-        unzip sdk-tools.zip -d cmdline-tools
-        mv cmdline-tools/cmdline-tools cmdline-tools/latest
         
         # 设置环境变量
         export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
         
         # 自动接受许可并安装必要组件
-        yes | sdkmanager --licenses
+        yes | sdkmanager --licenses || true
         sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
         
-        # 创建buildozer需要的目录结构
-        mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0
-        mkdir -p ~/.buildozer/android/platform/android-sdk/platform-tools
-        mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-        
-        # 创建符号链接，确保buildozer能找到build-tools和aidl
-        if [ -d "$ANDROID_HOME/build-tools/33.0.0" ]; then
-          echo "创建build-tools符号链接..."
-          ln -sf "$ANDROID_HOME/build-tools/33.0.0/"* ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/
-          # 确保aidl有执行权限
-          if [ -f "$ANDROID_HOME/build-tools/33.0.0/aidl" ]; then
-            chmod +x "$ANDROID_HOME/build-tools/33.0.0/aidl"
-            echo "aidl工具已找到并设置执行权限"
-          else
-            echo "警告: aidl工具不存在，重新安装build-tools"
-            sdkmanager "build-tools;33.0.0"
-          fi
-        else
-          echo "错误: build-tools 33.0.0目录不存在"
-          exit 1
+        # 关键点：创建符号链接而不是复制文件
+        # 确保buildozer能找到SDK
+        mkdir -p ~/.buildozer/android/platform
+        # 创建从buildozer目录到系统SDK的符号链接
+        if [ ! -L "~/.buildozer/android/platform/android-sdk" ]; then
+          ln -sf "$ANDROID_HOME" "~/.buildozer/android/platform/android-sdk"
+          echo "已创建SDK符号链接"
         fi
         
-        # 复制sdkmanager到buildozer期望的位置
-        cp "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ~/.buildozer/android/platform/android-sdk/tools/bin/
-        chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-        
-        # 验证目录结构和工具
-        echo "验证目录结构..."
-        ls -la "$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.0/" | grep -E "aidl|zipalign"
-        echo "验证aidl工具..."
-        # 使用绝对路径验证
-        AIDL_PATH="$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl"
-        if [ -x "$AIDL_PATH" ]; then
-          echo "aidl工具在buildozer路径中可用"
-        else
-          echo "复制aidl工具到buildozer路径..."
-          # 确保目标目录存在
-          mkdir -p "$(dirname "$AIDL_PATH")"
-          # 直接复制文件
-          cp "$ANDROID_HOME/build-tools/33.0.0/aidl" "$AIDL_PATH"
+        # 确保build-tools目录和aidl工具存在且可执行
+        AIDL_PATH="$ANDROID_HOME/build-tools/33.0.0/aidl"
+        if [ -f "$AIDL_PATH" ]; then
           chmod +x "$AIDL_PATH"
-          echo "已成功复制并设置aidl执行权限"
+          echo "✅ aidl工具已找到并设置执行权限"
+        else
+          echo "❌ aidl工具不存在，重新安装build-tools"
+          sdkmanager "build-tools;33.0.0"
+          # 再次检查
+          if [ -f "$AIDL_PATH" ]; then
+            chmod +x "$AIDL_PATH"
+            echo "✅ 重新安装后aidl工具已可用"
+          else
+            echo "❌ 重新安装后aidl工具仍然不可用"
+            ls -la "$ANDROID_HOME/build-tools/33.0.0/"
+          fi
         fi
         
-        # 最终验证
-        echo "最终验证aidl工具..."
-        if [ -x "$AIDL_PATH" ]; then
-          echo "✅ aidl工具验证成功"
-        else
-          echo "❌ aidl工具仍然不可用"
-          ls -la "$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.0/"
-          exit 1
-        fi
+        # 验证SDK配置
+        echo "验证SDK路径..."
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        echo "PATH包含SDK路径: $PATH"
+        echo "SDK目录内容:"
+        ls -la "$ANDROID_HOME"
+        echo "build-tools目录内容:"
+        ls -la "$ANDROID_HOME/build-tools/33.0.0/" | grep -E "aidl|zipalign"
+        
+        # 确保java版本正确
+        java -version
+        javac -version
 
     - name: Configure Buildozer
       run: |
         # 初始化buildozer（如果需要）
         buildozer init || true
         
-        # 配置buildozer使用我们的SDK
-        export ANDROID_HOME="$HOME/android-sdk"
+        # 配置buildozer使用系统SDK
+        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        export ANDROID_SDK_ROOT="$ANDROID_HOME"
         export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
         
         # 更新buildozer.spec文件
@@ -128,12 +110,20 @@ jobs:
         echo "android.sdk_path = $ANDROID_HOME" >> buildozer.spec
         echo "android.build_tools_version = 33.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
+        echo "android.ndk_path = $ANDROID_NDK_HOME" >> buildozer.spec
+        
+        # 显示配置信息
+        echo "Buildozer配置完成，使用SDK路径: $ANDROID_HOME"
 
     - name: Build APK
       run: |
-        # 设置环境变量
-        export ANDROID_HOME="$HOME/android-sdk"
+        # 设置环境变量 - 使用系统SDK
+        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        export ANDROID_SDK_ROOT="$ANDROID_HOME"
         export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+        
+        # 设置日志级别以便更好地调试
+        export BUILDOZER_LOG_LEVEL=2
         
         # 运行构建
         buildozer --verbose android debug
