@@ -51,10 +51,10 @@ jobs:
         
         # 关键点：创建符号链接而不是复制文件
         # 确保buildozer能找到SDK
-        mkdir -p ~/.buildozer/android/platform
+        mkdir -p "$HOME/.buildozer/android/platform"
         # 创建从buildozer目录到系统SDK的符号链接
-        if [ ! -L "~/.buildozer/android/platform/android-sdk" ]; then
-          ln -sf "$ANDROID_HOME" "~/.buildozer/android/platform/android-sdk"
+        if [ ! -L "$HOME/.buildozer/android/platform/android-sdk" ]; then
+          ln -sf "$ANDROID_HOME" "$HOME/.buildozer/android/platform/android-sdk"
           echo "已创建SDK符号链接"
         fi
         
