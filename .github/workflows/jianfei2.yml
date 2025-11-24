@@ -21,241 +21,67 @@ jobs:
         cache: 'pip'
         cache-dependency-path: 'requirements.txt'
 
-    - name: Install dependencies
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install buildozer cython==0.29.33
 
-    - name: Install buildozer dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential git python3-dev python3-setuptools python3-pip python3-venv
         sudo apt-get install -y default-jdk zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev curl libbz2-dev
         sudo apt-get install -y autoconf automake libtool pkg-config
         sudo apt-get install -y --no-install-recommends openjdk-11-jdk
-        
-        # 直接安装Android SDK命令行工具
-        echo "安装Android SDK命令行工具..."
+
+    - name: Set up Android SDK directly
+      run: |
+        # 设置SDK路径
+        export ANDROID_HOME="$HOME/android-sdk"
+        mkdir -p "$ANDROID_HOME"
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
-        mkdir -p $HOME/android-sdk
-        cd $HOME/android-sdk
+        
+        # 下载并安装SDK命令行工具
+        cd "$ANDROID_HOME"
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk-tools.zip
         unzip sdk-tools.zip -d cmdline-tools
         mv cmdline-tools/cmdline-tools cmdline-tools/latest
         
-        # 设置SDK环境变量
+        # 设置环境变量
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+        
+        # 自动接受许可并安装必要组件
+        yes | sdkmanager --licenses
+        sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+
+    - name: Configure Buildozer
+      run: |
+        # 初始化buildozer（如果需要）
+        buildozer init || true
+        
+        # 配置buildozer使用我们的SDK
         export ANDROID_HOME="$HOME/android-sdk"
         export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
         
-        # 自动接受许可并安装必要的SDK组件
-        echo "安装必要的Android SDK组件..."
-        yes | sdkmanager --licenses || true
-        sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
-        
-        # 确保buildozer使用我们安装的SDK
-        mkdir -p ~/.buildozer/android/platform
-        # 彻底删除可能存在的旧SDK目录，避免冲突
-        rm -rf ~/.buildozer/android/platform/android-sdk
-        # 创建必要的目录结构
-        mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-        mkdir -p ~/.buildozer/android/platform/android-sdk/platform-tools
-        mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0
-        
-        # 创建一个自定义的sdkmanager包装脚本，它会调用我们正确安装的sdkmanager
-        echo "创建自定义sdkmanager包装脚本..."
-        cat > ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager << 'EOF'
-#!/bin/bash
-# 自定义sdkmanager包装脚本，调用正确位置的sdkmanager
-
-# 指向正确安装的sdkmanager
-REAL_SDKMANAGER="$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager"
-
-# 检查真实的sdkmanager是否存在
-if [ -x "$REAL_SDKMANAGER" ]; then
-    echo "使用真实的sdkmanager: $REAL_SDKMANAGER"
-    # 执行真实的sdkmanager，传递所有参数
-    exec "$REAL_SDKMANAGER" "$@"
-else
-    echo "错误：真实的sdkmanager不存在或不可执行: $REAL_SDKMANAGER"
-    exit 1
-fi
-EOF
-        
-        # 设置脚本可执行权限
-        chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-        
-        # 验证包装脚本创建成功
-        echo "验证sdkmanager包装脚本..."
-        ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-        if [ -x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager ]; then
-            echo "sdkmanager包装脚本创建成功且可执行"
-        else
-            echo "sdkmanager包装脚本创建失败或无执行权限"
-            chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-            echo "已重新设置执行权限"
-        fi
-        
-        # 创建符号链接指向我们安装的SDK组件
-        echo "创建SDK组件符号链接..."
-        # 为platform-tools创建符号链接
-        ln -sf $ANDROID_HOME/platform-tools/* ~/.buildozer/android/platform/android-sdk/platform-tools/ 2>/dev/null || echo "platform-tools链接部分失败，继续..."
-        # 为build-tools创建符号链接
-        ln -sf $ANDROID_HOME/build-tools/33.0.0/* ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/ 2>/dev/null || echo "build-tools链接部分失败，继续..."
-        
-        # 设置环境变量确保buildozer能找到SDK
-        export ANDROID_SDK_ROOT="$HOME/android-sdk"
-        export ANDROID_NDK_HOME="$ANDROID_HOME/ndk-bundle"
-
-    - name: Cache Buildozer files
-      uses: actions/cache@v4
-      with:
-        path: |
-          .buildozer
-          bin/
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-buildozer-
-    
-    - name: Initialize buildozer
-      run: |
-        buildozer init || true
-
-    - name: Build APK
-      run: |
-        # 设置与前面步骤一致的SDK环境变量
-        export ANDROID_HOME="$HOME/android-sdk"
-        export ANDROID_SDK_ROOT="$HOME/android-sdk"
-        export ANDROID_NDK_HOME="$ANDROID_HOME/ndk-bundle"
-        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.0:$PATH"
-        
-        # 添加详细调试信息以验证SDK路径和工具可用性
-        echo "=== 详细环境和路径检查 ==="
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-        echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
-        echo "PATH: $PATH"
-        
-        echo "=== SDK目录结构详细检查 ==="
-        ls -la $ANDROID_HOME
-        find $ANDROID_HOME -name "sdkmanager" -type f
-        find ~/.buildozer/android/platform/android-sdk -name "sdkmanager" -type f
-        
-        echo "=== 具体SDK工具目录检查 ==="
-        ls -la $ANDROID_HOME/cmdline-tools/latest/bin/ 2>/dev/null || echo "最新SDK工具目录不存在"
-        ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/ 2>/dev/null || echo "旧SDK工具目录不存在"
-        
-        echo "=== Build-tools目录详细检查 ==="
-        ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "Build-tools目录不存在"
-        if [ -d "$ANDROID_HOME/build-tools/33.0.0" ]; then
-            ls -la $ANDROID_HOME/build-tools/33.0.0/ | grep -E "aidl|zipalign"
-        else
-            echo "build-tools 33.0.0目录不存在"
-        fi
-        
-        echo "=== 检查关键工具和权限 ==="
-        which sdkmanager || echo "sdkmanager不在PATH中"
-        if [ -x "$(which sdkmanager)" ]; then
-            echo "sdkmanager可执行"
-            sdkmanager --version 2>/dev/null || echo "sdkmanager版本检查失败"
-        else
-            echo "sdkmanager不可执行"
-        fi
-        
-        # 测试buildozer期望的sdkmanager路径
-        echo "=== 测试buildozer期望的sdkmanager路径 ==="
-        SDKMANAGER_PATH="~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
-        EXPANDED_PATH=$(eval echo "$SDKMANAGER_PATH")
-        
-        if [ -x "$EXPANDED_PATH" ]; then
-            echo "buildozer期望的sdkmanager可执行: $EXPANDED_PATH"
-            # 测试我们的包装脚本是否工作
-            echo "测试包装脚本是否能找到真实的sdkmanager..."
-            if [ -x "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
-                echo "真实的sdkmanager存在且可执行"
-                $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version 2>/dev/null || echo "真实sdkmanager版本检查失败，但脚本应该能处理"
-            else
-                echo "警告: 真实的sdkmanager不存在或不可执行"
-                ls -la $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager
-            fi
-        else
-            echo "buildozer期望的sdkmanager不可执行: $EXPANDED_PATH"
-            ls -la "$EXPANDED_PATH"
-            chmod +x "$EXPANDED_PATH"
-            echo "已重新设置执行权限"
-        fi
-        
-        # 配置buildozer以确保正确处理SDK和build-tools
-        echo "=== 配置buildozer构建选项 ==="
-        # 移除可能已存在的相关配置，避免重复
+        # 更新buildozer.spec文件
         sed -i '/android.accept_sdk_license =/d' buildozer.spec
         sed -i '/android.sdk_path =/d' buildozer.spec
         sed -i '/android.build_tools_version =/d' buildozer.spec
         sed -i '/android.api =/d' buildozer.spec
-        # 添加正确的配置
+        
         echo "android.accept_sdk_license = True" >> buildozer.spec
-        echo "android.sdk_path = $HOME/android-sdk" >> buildozer.spec
+        echo "android.sdk_path = $ANDROID_HOME" >> buildozer.spec
         echo "android.build_tools_version = 33.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
-        # 确保buildozer知道使用我们配置的SDK路径
-        echo "android.ndk_path = $ANDROID_NDK_HOME" >> buildozer.spec
-        # 查看更新后的配置
-        grep -E 'android\.(sdk_path|build_tools_version|api|accept_sdk_license|ndk_path)' buildozer.spec
-        
-        # 在执行buildozer前进行最终验证
-        echo "=== 最终路径和工具验证 ==="
-        # 再次确认sdkmanager在buildozer期望的位置并且可执行
-        BUILDOZER_SDKMANAGER="~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
-        EXPANDED_BUILDOZER_SDKMANAGER=$(eval echo "$BUILDOZER_SDKMANAGER")
-        
-        if [ ! -x "$EXPANDED_BUILDOZER_SDKMANAGER" ]; then
-            echo "紧急修复: sdkmanager不在buildozer期望的位置或不可执行"
-            mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-            # 创建包装脚本而不是直接复制
-            cat > "$EXPANDED_BUILDOZER_SDKMANAGER" << 'EOF'
-#!/bin/bash
-# 自定义sdkmanager包装脚本，调用正确位置的sdkmanager
 
-# 指向正确安装的sdkmanager
-REAL_SDKMANAGER="$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager"
-
-# 检查真实的sdkmanager是否存在
-if [ -x "$REAL_SDKMANAGER" ]; then
-    echo "使用真实的sdkmanager: $REAL_SDKMANAGER"
-    # 执行真实的sdkmanager，传递所有参数
-    exec "$REAL_SDKMANAGER" "$@"
-else
-    echo "错误: 找不到真实的sdkmanager: $REAL_SDKMANAGER"
-    exit 1
-fi
-EOF
-            chmod +x "$EXPANDED_BUILDOZER_SDKMANAGER"
-            ls -la "$EXPANDED_BUILDOZER_SDKMANAGER"
-        fi
+    - name: Build APK
+      run: |
+        # 设置环境变量
+        export ANDROID_HOME="$HOME/android-sdk"
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
         
-        # 确保build-tools/33.0.0目录存在并包含aidl工具
-        if [ ! -d "$ANDROID_HOME/build-tools/33.0.0" ]; then
-            echo "警告: build-tools 33.0.0目录不存在，重新安装..."
-            sdkmanager "build-tools;33.0.0"
-        else
-            echo "检查AIDL工具是否存在..."
-            if [ -f "$ANDROID_HOME/build-tools/33.0.0/aidl" ]; then
-                echo "AIDL工具存在: $ANDROID_HOME/build-tools/33.0.0/aidl"
-                chmod +x $ANDROID_HOME/build-tools/33.0.0/aidl
-            else
-                echo "警告: AIDL工具不存在，重新安装build-tools..."
-                sdkmanager "build-tools;33.0.0"
-            fi
-        fi
-        
-        # 使用增加的超时和重试选项运行buildozer
-        echo "=== 开始构建APK ==="
-        # 设置环境变量确保buildozer使用我们的SDK
-        export P4A_SDK_PATH="$ANDROID_HOME"
-        export P4A_BUILD_TOOLS_VERSION="33.0.0"
-        export P4A_API="33"
-        
-        # 使用详细模式运行buildozer，方便调试
+        # 运行构建
         buildozer --verbose android debug
       env:
         # 设置构建环境变量
@@ -263,8 +89,6 @@ EOF
         P4A_RELEASE_KEYSTORE: ${{ secrets.KEYSTORE }}
         P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.KEYSTORE_PASSWORD }}
         P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.KEYALIAS_PASSWORD }}
-        # 确保构建过程中的SDK许可自动接受
-        ANDROID_ACCEPT_SDK_LICENSES: "True"
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
