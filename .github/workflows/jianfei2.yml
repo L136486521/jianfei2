@@ -55,7 +55,15 @@ jobs:
         
         # 确保buildozer使用我们安装的SDK
         mkdir -p ~/.buildozer/android/platform
+        # 彻底删除可能存在的旧SDK目录，避免冲突
+        rm -rf ~/.buildozer/android/platform/android-sdk
+        # 创建指向我们安装的SDK的符号链接
         ln -sf $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
+        # 确保tools/bin目录结构存在，即使它是较新的SDK结构
+        mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+        # 复制sdkmanager到buildozer期望的位置
+        cp $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+        chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
 
     - name: Cache Buildozer files
       uses: actions/cache@v4
@@ -77,8 +85,23 @@ jobs:
         export ANDROID_HOME="$HOME/android-sdk"
         export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.0:$PATH"
         
+        # 添加调试信息以验证SDK路径和工具可用性
+        echo "=== 环境和路径检查 ==="
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "PATH: $PATH"
+        echo "=== SDK目录结构 ==="
+        ls -la $ANDROID_HOME
+        echo "=== SDK工具目录 ==="
+        ls -la $ANDROID_HOME/cmdline-tools/latest/bin/ 2>/dev/null || echo "最新SDK工具目录不存在"
+        ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/ 2>/dev/null || echo "旧SDK工具目录不存在"
+        echo "=== Build-tools目录 ==="
+        ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "Build-tools目录不存在"
+        echo "=== 检查关键工具 ==="
+        which sdkmanager || echo "sdkmanager不在PATH中"
+        ls -la $(which sdkmanager 2>/dev/null) 2>/dev/null || echo "无法获取sdkmanager详细信息"
+        
         # 配置buildozer以确保正确处理SDK和build-tools
-        echo "配置buildozer构建选项..."
+        echo "=== 配置buildozer构建选项 ==="
         # 移除可能已存在的相关配置，避免重复
         sed -i '/android.accept_sdk_license =/d' buildozer.spec
         sed -i '/android.sdk_path =/d' buildozer.spec
@@ -89,8 +112,11 @@ jobs:
         echo "android.sdk_path = $HOME/android-sdk" >> buildozer.spec
         echo "android.build_tools_version = 33.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
+        # 查看更新后的配置
+        grep -E 'android\.(sdk_path|build_tools_version|api|accept_sdk_license)' buildozer.spec
         
         # 使用增加的超时和重试选项运行buildozer
+        echo "=== 开始构建APK ==="
         buildozer --verbose android debug
       env:
         # 设置构建环境变量
