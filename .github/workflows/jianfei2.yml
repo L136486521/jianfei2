@@ -83,14 +83,30 @@ jobs:
         
         # 验证目录结构和工具
         echo "验证目录结构..."
-        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/ | grep -E "aidl|zipalign"
+        ls -la "$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.0/" | grep -E "aidl|zipalign"
         echo "验证aidl工具..."
-        if [ -x "~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl" ]; then
+        # 使用绝对路径验证
+        AIDL_PATH="$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl"
+        if [ -x "$AIDL_PATH" ]; then
           echo "aidl工具在buildozer路径中可用"
         else
           echo "复制aidl工具到buildozer路径..."
-          cp "$ANDROID_HOME/build-tools/33.0.0/aidl" "~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/"
-          chmod +x "~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl"
+          # 确保目标目录存在
+          mkdir -p "$(dirname "$AIDL_PATH")"
+          # 直接复制文件
+          cp "$ANDROID_HOME/build-tools/33.0.0/aidl" "$AIDL_PATH"
+          chmod +x "$AIDL_PATH"
+          echo "已成功复制并设置aidl执行权限"
+        fi
+        
+        # 最终验证
+        echo "最终验证aidl工具..."
+        if [ -x "$AIDL_PATH" ]; then
+          echo "✅ aidl工具验证成功"
+        else
+          echo "❌ aidl工具仍然不可用"
+          ls -la "$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.0/"
+          exit 1
         fi
 
     - name: Configure Buildozer
