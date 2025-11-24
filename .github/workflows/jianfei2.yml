@@ -68,8 +68,6 @@ jobs:
 #!/bin/bash
 # 自定义sdkmanager包装脚本，调用正确位置的sdkmanager
 
-# 获取当前脚本的目录
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # 指向正确安装的sdkmanager
 REAL_SDKMANAGER="$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager"
 
@@ -79,7 +77,7 @@ if [ -x "$REAL_SDKMANAGER" ]; then
     # 执行真实的sdkmanager，传递所有参数
     exec "$REAL_SDKMANAGER" "$@"
 else
-    echo "错误: 找不到真实的sdkmanager: $REAL_SDKMANAGER"
+    echo "错误：真实的sdkmanager不存在或不可执行: $REAL_SDKMANAGER"
     exit 1
 fi
 EOF
