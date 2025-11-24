@@ -34,23 +34,28 @@ jobs:
         sudo apt-get install -y autoconf automake libtool pkg-config
         sudo apt-get install -y --no-install-recommends openjdk-11-jdk
         
-        # 为buildozer准备Android SDK环境
-        echo "为buildozer准备Android环境..."
+        # 直接安装Android SDK命令行工具
+        echo "安装Android SDK命令行工具..."
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        mkdir -p $HOME/android-sdk
+        cd $HOME/android-sdk
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk-tools.zip
+        unzip sdk-tools.zip -d cmdline-tools
+        mv cmdline-tools/cmdline-tools cmdline-tools/latest
+        
+        # 设置SDK环境变量
+        export ANDROID_HOME="$HOME/android-sdk"
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+        
+        # 自动接受许可并安装必要的SDK组件
+        echo "安装必要的Android SDK组件..."
+        yes | sdkmanager --licenses || true
+        sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
+        
+        # 确保buildozer使用我们安装的SDK
         mkdir -p ~/.buildozer/android/platform
-        
-        # 在GitHub Actions环境中，我们将让buildozer自行管理SDK安装
-        # 但设置一些必要的环境变量
-        export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
-        export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
-        
-        # 检查GitHub Actions环境是否有预安装的SDK工具
-        echo "检查SDK环境..."
-        if command -v sdkmanager &> /dev/null; then
-          echo "发现系统SDK管理器..."
-          sdkmanager --version || echo "SDK管理器存在但版本检查失败"
-        else
-          echo "将使用buildozer自动安装SDK工具..."
-        fi
+        ln -sf $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
 
     - name: Cache Buildozer files
       uses: actions/cache@v4
@@ -69,8 +74,8 @@ jobs:
     - name: Build APK
       run: |
         # 设置与前面步骤一致的ANDROID_HOME路径
-        export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
-        export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
+        export ANDROID_HOME="$HOME/android-sdk"
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.0:$PATH"
         
         # 配置buildozer以确保正确处理SDK和build-tools
         echo "配置buildozer构建选项..."
@@ -81,7 +86,7 @@ jobs:
         sed -i '/android.api =/d' buildozer.spec
         # 添加正确的配置
         echo "android.accept_sdk_license = True" >> buildozer.spec
-        echo "android.sdk_path = $HOME/.buildozer/android/platform/android-sdk" >> buildozer.spec
+        echo "android.sdk_path = $HOME/android-sdk" >> buildozer.spec
         echo "android.build_tools_version = 33.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
         
