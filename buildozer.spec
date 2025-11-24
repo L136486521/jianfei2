@@ -24,7 +24,7 @@ android.allow_backup = True
 android.enable_androidx = True
 android.build_tools_version = 33.0.0
 android.accept_sdk_license = True
-android.sdk_path = /usr/local/lib/android/sdk
+android.sdk_path = $HOME/.buildozer/android/platform/android-sdk
 
 # 权限配置
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
