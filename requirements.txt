@@ -12,3 +12,4 @@ openpyxl==3.0.10
 
 # 其他依赖
 pillow
+requests
