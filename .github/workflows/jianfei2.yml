@@ -37,20 +37,19 @@ jobs:
         # 为buildozer准备Android SDK环境
         echo "为buildozer准备Android环境..."
         mkdir -p ~/.buildozer/android/platform
-        # 设置环境变量以帮助buildozer找到系统安装的SDK
-        echo "设置Android环境变量..."
-        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        
+        # 在GitHub Actions环境中，我们将让buildozer自行管理SDK安装
+        # 但设置一些必要的环境变量
+        export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
         export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
         
-        # 检查是否可以访问系统SDK管理器
-        if [ -f "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
-          echo "使用系统SDK管理器..."
-          chmod +x $ANDROID_HOME/tools/bin/sdkmanager
-          # 自动接受许可并安装必要的SDK组件
-          yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
-          yes | $ANDROID_HOME/tools/bin/sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools" || true
+        # 检查GitHub Actions环境是否有预安装的SDK工具
+        echo "检查SDK环境..."
+        if command -v sdkmanager &> /dev/null; then
+          echo "发现系统SDK管理器..."
+          sdkmanager --version || echo "SDK管理器存在但版本检查失败"
         else
-          echo "系统SDK管理器不可用，将依赖buildozer自动安装..."
+          echo "将使用buildozer自动安装SDK工具..."
         fi
 
     - name: Cache Buildozer files
@@ -69,14 +68,20 @@ jobs:
 
     - name: Build APK
       run: |
-        # 增加超时时间并优化构建过程
-        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        # 设置与前面步骤一致的ANDROID_HOME路径
+        export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
         export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
         
         # 配置buildozer以确保正确处理SDK和build-tools
         echo "配置buildozer构建选项..."
+        # 移除可能已存在的相关配置，避免重复
+        sed -i '/android.accept_sdk_license =/d' buildozer.spec
+        sed -i '/android.sdk_path =/d' buildozer.spec
+        sed -i '/android.build_tools_version =/d' buildozer.spec
+        sed -i '/android.api =/d' buildozer.spec
+        # 添加正确的配置
         echo "android.accept_sdk_license = True" >> buildozer.spec
-        echo "android.sdk_path = /usr/local/lib/android/sdk" >> buildozer.spec
+        echo "android.sdk_path = $HOME/.buildozer/android/platform/android-sdk" >> buildozer.spec
         echo "android.build_tools_version = 33.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
         
