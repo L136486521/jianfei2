@@ -42,51 +42,75 @@ jobs:
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
         
-        # 设置环境变量
-        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-        
-        # 自动接受许可并安装必要组件
-        yes | sdkmanager --licenses || true
-        sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools"
-        
-        # 关键点：创建符号链接而不是复制文件
-        # 确保buildozer能找到SDK
-        mkdir -p "$HOME/.buildozer/android/platform"
-        # 创建从buildozer目录到系统SDK的符号链接
-        if [ ! -L "$HOME/.buildozer/android/platform/android-sdk" ]; then
-          ln -sf "$ANDROID_HOME" "$HOME/.buildozer/android/platform/android-sdk"
-          echo "已创建SDK符号链接"
-        fi
-        
-        # 确保build-tools目录和aidl工具存在且可执行
-        AIDL_PATH="$ANDROID_HOME/build-tools/33.0.0/aidl"
-        if [ -f "$AIDL_PATH" ]; then
-          chmod +x "$AIDL_PATH"
-          echo "✅ aidl工具已找到并设置执行权限"
+        # 设置环境变量 - 优先使用cmdline-tools/bin目录
+        export CMDLINE_TOOLS="$ANDROID_HOME/cmdline-tools/latest"
+        if [ -d "$CMDLINE_TOOLS" ]; then
+          export PATH="$CMDLINE_TOOLS/bin:$ANDROID_HOME/platform-tools:$PATH"
         else
-          echo "❌ aidl工具不存在，重新安装build-tools"
-          sdkmanager "build-tools;33.0.0"
-          # 再次检查
-          if [ -f "$AIDL_PATH" ]; then
-            chmod +x "$AIDL_PATH"
-            echo "✅ 重新安装后aidl工具已可用"
+          # 备选路径
+          export CMDLINE_TOOLS="$ANDROID_HOME/cmdline-tools/2.1"
+          if [ -d "$CMDLINE_TOOLS" ]; then
+            export PATH="$CMDLINE_TOOLS/bin:$ANDROID_HOME/platform-tools:$PATH"
           else
-            echo "❌ 重新安装后aidl工具仍然不可用"
-            ls -la "$ANDROID_HOME/build-tools/33.0.0/"
+            # 回退到基础路径
+            export PATH="$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools:$PATH"
           fi
         fi
         
+        # 验证sdkmanager是否存在
+        echo "查找sdkmanager..."
+        if command -v sdkmanager &> /dev/null; then
+          echo "✅ sdkmanager命令已找到"
+          SDKMANAGER_PATH=$(command -v sdkmanager)
+          echo "sdkmanager路径: $SDKMANAGER_PATH"
+        else
+          echo "❌ sdkmanager命令未找到，尝试查找可能的位置..."
+          find "$ANDROID_HOME" -name "sdkmanager" -type f
+          
+          # 备选：使用gradle包装的sdkmanager
+          if [ -f "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
+            export PATH="$ANDROID_HOME/tools/bin:$PATH"
+            echo "已添加备用sdkmanager路径"
+          fi
+        fi
+        
+        # 自动接受许可并安装必要组件
+        echo "安装必要的SDK组件..."
+        yes | sdkmanager --licenses || echo "许可已接受或无需接受"
+        sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools" || {
+          echo "警告：SDK组件安装可能失败，继续执行..."
+        }
+        
+        # 确保build-tools目录存在
+        mkdir -p "$ANDROID_HOME/build-tools/33.0.0"
+        
+        # 检查关键工具
+        echo "检查关键构建工具..."
+        for tool in aidl zipalign aapt; do
+          TOOL_PATH="$ANDROID_HOME/build-tools/33.0.0/$tool"
+          if [ -f "$TOOL_PATH" ]; then
+            chmod +x "$TOOL_PATH"
+            echo "✅ $tool工具已找到并设置执行权限"
+          else
+            echo "❌ $tool工具未找到：$TOOL_PATH"
+            # 查找工具可能的位置
+            echo "正在查找$tool工具..."
+            find "$ANDROID_HOME" -name "$tool" -type f
+          fi
+        done
+        
         # 验证SDK配置
-        echo "验证SDK路径..."
+        echo "验证SDK配置..."
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-        echo "PATH包含SDK路径: $PATH"
-        echo "SDK目录内容:"
+        echo "PATH: $PATH"
+        echo "SDK目录结构:"
         ls -la "$ANDROID_HOME"
-        echo "build-tools目录内容:"
-        ls -la "$ANDROID_HOME/build-tools/33.0.0/" | grep -E "aidl|zipalign"
+        ls -la "$ANDROID_HOME/build-tools/" || echo "build-tools目录不存在"
+        ls -la "$ANDROID_HOME/cmdline-tools/" || echo "cmdline-tools目录不存在"
         
         # 确保java版本正确
+        echo "Java版本信息:"
         java -version
         javac -version
 
@@ -98,34 +122,134 @@ jobs:
         # 配置buildozer使用系统SDK
         export ANDROID_HOME="/usr/local/lib/android/sdk"
         export ANDROID_SDK_ROOT="$ANDROID_HOME"
-        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+        export CMDLINE_TOOLS="$ANDROID_HOME/cmdline-tools/latest"
+        
+        # 配置灵活的路径查找
+        if [ -d "$CMDLINE_TOOLS" ]; then
+          export PATH="$CMDLINE_TOOLS/bin:$ANDROID_HOME/platform-tools:$PATH"
+          SDKMANAGER_LOCATION="$CMDLINE_TOOLS/bin/sdkmanager"
+        else
+          # 备选路径
+          export CMDLINE_TOOLS="$ANDROID_HOME/cmdline-tools/2.1"
+          if [ -d "$CMDLINE_TOOLS" ]; then
+            export PATH="$CMDLINE_TOOLS/bin:$ANDROID_HOME/platform-tools:$PATH"
+            SDKMANAGER_LOCATION="$CMDLINE_TOOLS/bin/sdkmanager"
+          else
+            # 其他可能的位置
+            for candidate in "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"; do
+              if [ -f "$candidate" ]; then
+                SDKMANAGER_LOCATION="$candidate"
+                export PATH="$(dirname "$candidate"):$ANDROID_HOME/platform-tools:$PATH"
+                break
+              fi
+            done
+          fi
+        fi
+        
+        # 查找并记录sdkmanager的实际位置
+        if [ -z "$SDKMANAGER_LOCATION" ] || [ ! -f "$SDKMANAGER_LOCATION" ]; then
+          echo "尝试查找sdkmanager..."
+          SDKMANAGER_LOCATION=$(find "$ANDROID_HOME" -name "sdkmanager" -type f 2>/dev/null | head -1)
+          if [ -f "$SDKMANAGER_LOCATION" ]; then
+            echo "找到sdkmanager: $SDKMANAGER_LOCATION"
+            export PATH="$(dirname "$SDKMANAGER_LOCATION"):$PATH"
+          else
+            echo "警告: 未找到sdkmanager，将创建包装脚本"
+            # 创建一个包装脚本指向可能的位置
+            mkdir -p ~/.local/bin
+            cat > ~/.local/bin/sdkmanager << 'EOF'
+        #!/bin/bash
+        # 尝试多个可能的sdkmanager位置
+        for loc in \
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager \
+          /usr/local/lib/android/sdk/cmdline-tools/2.1/bin/sdkmanager \
+          /usr/local/lib/android/sdk/cmdline-tools/bin/sdkmanager \
+          /usr/local/lib/android/sdk/tools/bin/sdkmanager; do
+          if [ -f "$loc" ]; then
+            exec "$loc" "$@"
+          fi
+        done
+        # 如果都找不到，显示错误信息
+        echo "错误: 找不到sdkmanager"
+        exit 1
+        EOF
+            chmod +x ~/.local/bin/sdkmanager
+            export PATH="~/.local/bin:$PATH"
+            SDKMANAGER_LOCATION="~/.local/bin/sdkmanager"
+          fi
+        fi
         
         # 更新buildozer.spec文件
         sed -i '/android.accept_sdk_license =/d' buildozer.spec
         sed -i '/android.sdk_path =/d' buildozer.spec
         sed -i '/android.build_tools_version =/d' buildozer.spec
         sed -i '/android.api =/d' buildozer.spec
+        sed -i '/android.ndk_path =/d' buildozer.spec
         
+        # 添加配置
         echo "android.accept_sdk_license = True" >> buildozer.spec
         echo "android.sdk_path = $ANDROID_HOME" >> buildozer.spec
         echo "android.build_tools_version = 33.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
-        echo "android.ndk_path = $ANDROID_NDK_HOME" >> buildozer.spec
+        
+        # 为buildozer创建环境配置，确保它能找到正确的sdkmanager
+        mkdir -p ~/.buildozer/android/platform
         
         # 显示配置信息
-        echo "Buildozer配置完成，使用SDK路径: $ANDROID_HOME"
+        echo "Buildozer配置完成:"
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "SDKMANAGER位置: $SDKMANAGER_LOCATION"
+        echo "PATH: $PATH"
+        cat buildozer.spec | grep android.
 
     - name: Build APK
       run: |
         # 设置环境变量 - 使用系统SDK
         export ANDROID_HOME="/usr/local/lib/android/sdk"
         export ANDROID_SDK_ROOT="$ANDROID_HOME"
-        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+        export CMDLINE_TOOLS="$ANDROID_HOME/cmdline-tools/latest"
         
-        # 设置日志级别以便更好地调试
+        # 配置路径以确保找到sdkmanager
+        if [ -d "$CMDLINE_TOOLS" ]; then
+          export PATH="$CMDLINE_TOOLS/bin:$ANDROID_HOME/platform-tools:$PATH"
+        else
+          # 备选路径
+          export CMDLINE_TOOLS="$ANDROID_HOME/cmdline-tools/2.1"
+          if [ -d "$CMDLINE_TOOLS" ]; then
+            export PATH="$CMDLINE_TOOLS/bin:$ANDROID_HOME/platform-tools:$PATH"
+          else
+            export PATH="$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools:$PATH"
+          fi
+        fi
+        
+        # 为buildozer创建一个sdkmanager包装脚本，直接使用系统的sdkmanager
+        mkdir -p ~/.local/bin
+        echo '#!/bin/bash
+        /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "$@"' > ~/.local/bin/sdkmanager
+        chmod +x ~/.local/bin/sdkmanager
+        export PATH="~/.local/bin:$PATH"
+        
+        # 设置详细日志级别以便更好地调试
         export BUILDOZER_LOG_LEVEL=2
+        export P4A_VERBOSE=1
+        
+        # 运行构建前先测试sdkmanager
+        echo "测试sdkmanager可用性..."
+        if command -v sdkmanager &> /dev/null; then
+          echo "✅ sdkmanager可用"
+          SDKMANAGER_PATH=$(command -v sdkmanager)
+          echo "使用的sdkmanager路径: $SDKMANAGER_PATH"
+        else
+          echo "❌ sdkmanager不可用，尝试修复..."
+          # 创建软链接到可能的位置
+          if [ -f "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
+            ln -sf /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager /usr/local/bin/
+            echo "已创建sdkmanager链接到/usr/local/bin"
+          fi
+        fi
         
         # 运行构建
+        echo "开始构建APK..."
         buildozer --verbose android debug
       env:
         # 设置构建环境变量
