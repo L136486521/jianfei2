@@ -14,15 +14,17 @@ source.include_patterns = weighttracker.kv,*.db,*.txt
 main = main.py
 version = 1.0
 
-# Android 配置 - 更新到匹配工作流的版本
-android.api = 34
+# Android 配置 - 与GitHub Actions工作流保持一致
+android.api = 33
 android.minapi = 21
-android.targetapi = 34
-android.sdk_version = 34
+android.targetapi = 33
+android.sdk_version = 33
 android.ndk_api = 21
 android.allow_backup = True
 android.enable_androidx = True
-android.build_tools_version = 34.0.0
+android.build_tools_version = 33.0.0
+android.accept_sdk_license = True
+android.sdk_path = /usr/local/lib/android/sdk
 
 # 权限配置
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
