@@ -57,30 +57,53 @@ jobs:
         mkdir -p ~/.buildozer/android/platform
         # 彻底删除可能存在的旧SDK目录，避免冲突
         rm -rf ~/.buildozer/android/platform/android-sdk
-        # 创建完整的目录结构，确保buildozer能识别
+        # 创建必要的目录结构
         mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
         mkdir -p ~/.buildozer/android/platform/android-sdk/platform-tools
         mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0
         
-        # 复制必要的SDK组件到buildozer期望的位置
-        echo "复制SDK组件到buildozer目录..."
-        # 复制sdkmanager并确保权限正确
-        cp $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+        # 创建一个自定义的sdkmanager包装脚本，它会调用我们正确安装的sdkmanager
+        echo "创建自定义sdkmanager包装脚本..."
+        cat > ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager << 'EOF'
+#!/bin/bash
+# 自定义sdkmanager包装脚本，调用正确位置的sdkmanager
+
+# 获取当前脚本的目录
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# 指向正确安装的sdkmanager
+REAL_SDKMANAGER="$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager"
+
+# 检查真实的sdkmanager是否存在
+if [ -x "$REAL_SDKMANAGER" ]; then
+    echo "使用真实的sdkmanager: $REAL_SDKMANAGER"
+    # 执行真实的sdkmanager，传递所有参数
+    exec "$REAL_SDKMANAGER" "$@"
+else
+    echo "错误: 找不到真实的sdkmanager: $REAL_SDKMANAGER"
+    exit 1
+fi
+EOF
+        
+        # 设置脚本可执行权限
         chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
         
-        # 验证复制是否成功
-        echo "验证sdkmanager复制..."
+        # 验证包装脚本创建成功
+        echo "验证sdkmanager包装脚本..."
         ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
         if [ -x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager ]; then
-            echo "sdkmanager复制成功且可执行"
+            echo "sdkmanager包装脚本创建成功且可执行"
         else
-            echo "sdkmanager复制失败或无执行权限"
+            echo "sdkmanager包装脚本创建失败或无执行权限"
             chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
             echo "已重新设置执行权限"
         fi
         
-        # 创建指向我们安装的完整SDK的符号链接
-        ln -sf $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
+        # 创建符号链接指向我们安装的SDK组件
+        echo "创建SDK组件符号链接..."
+        # 为platform-tools创建符号链接
+        ln -sf $ANDROID_HOME/platform-tools/* ~/.buildozer/android/platform/android-sdk/platform-tools/ 2>/dev/null || echo "platform-tools链接部分失败，继续..."
+        # 为build-tools创建符号链接
+        ln -sf $ANDROID_HOME/build-tools/33.0.0/* ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/ 2>/dev/null || echo "build-tools链接部分失败，继续..."
         
         # 设置环境变量确保buildozer能找到SDK
         export ANDROID_SDK_ROOT="$HOME/android-sdk"
@@ -143,13 +166,24 @@ jobs:
         
         # 测试buildozer期望的sdkmanager路径
         echo "=== 测试buildozer期望的sdkmanager路径 ==="
-        if [ -x "~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" ]; then
-            echo "buildozer期望的sdkmanager可执行"
-            ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --version 2>/dev/null || echo "版本检查失败"
+        SDKMANAGER_PATH="~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+        EXPANDED_PATH=$(eval echo "$SDKMANAGER_PATH")
+        
+        if [ -x "$EXPANDED_PATH" ]; then
+            echo "buildozer期望的sdkmanager可执行: $EXPANDED_PATH"
+            # 测试我们的包装脚本是否工作
+            echo "测试包装脚本是否能找到真实的sdkmanager..."
+            if [ -x "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
+                echo "真实的sdkmanager存在且可执行"
+                $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --version 2>/dev/null || echo "真实sdkmanager版本检查失败，但脚本应该能处理"
+            else
+                echo "警告: 真实的sdkmanager不存在或不可执行"
+                ls -la $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager
+            fi
         else
-            echo "buildozer期望的sdkmanager不可执行"
-            ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-            chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+            echo "buildozer期望的sdkmanager不可执行: $EXPANDED_PATH"
+            ls -la "$EXPANDED_PATH"
+            chmod +x "$EXPANDED_PATH"
             echo "已重新设置执行权限"
         fi
         
@@ -173,12 +207,32 @@ jobs:
         # 在执行buildozer前进行最终验证
         echo "=== 最终路径和工具验证 ==="
         # 再次确认sdkmanager在buildozer期望的位置并且可执行
-        if [ ! -x "~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" ]; then
+        BUILDOZER_SDKMANAGER="~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+        EXPANDED_BUILDOZER_SDKMANAGER=$(eval echo "$BUILDOZER_SDKMANAGER")
+        
+        if [ ! -x "$EXPANDED_BUILDOZER_SDKMANAGER" ]; then
             echo "紧急修复: sdkmanager不在buildozer期望的位置或不可执行"
             mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-            cp $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-            chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-            ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+            # 创建包装脚本而不是直接复制
+            cat > "$EXPANDED_BUILDOZER_SDKMANAGER" << 'EOF'
+#!/bin/bash
+# 自定义sdkmanager包装脚本，调用正确位置的sdkmanager
+
+# 指向正确安装的sdkmanager
+REAL_SDKMANAGER="$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager"
+
+# 检查真实的sdkmanager是否存在
+if [ -x "$REAL_SDKMANAGER" ]; then
+    echo "使用真实的sdkmanager: $REAL_SDKMANAGER"
+    # 执行真实的sdkmanager，传递所有参数
+    exec "$REAL_SDKMANAGER" "$@"
+else
+    echo "错误: 找不到真实的sdkmanager: $REAL_SDKMANAGER"
+    exit 1
+fi
+EOF
+            chmod +x "$EXPANDED_BUILDOZER_SDKMANAGER"
+            ls -la "$EXPANDED_BUILDOZER_SDKMANAGER"
         fi
         
         # 确保build-tools/33.0.0目录存在并包含aidl工具
