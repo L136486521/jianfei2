@@ -33,6 +33,25 @@ jobs:
         sudo apt-get install -y default-jdk zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev curl libbz2-dev
         sudo apt-get install -y autoconf automake libtool pkg-config
         sudo apt-get install -y --no-install-recommends openjdk-11-jdk
+        
+        # 为buildozer准备Android SDK环境
+        echo "为buildozer准备Android环境..."
+        mkdir -p ~/.buildozer/android/platform
+        # 设置环境变量以帮助buildozer找到系统安装的SDK
+        echo "设置Android环境变量..."
+        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
+        
+        # 检查是否可以访问系统SDK管理器
+        if [ -f "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
+          echo "使用系统SDK管理器..."
+          chmod +x $ANDROID_HOME/tools/bin/sdkmanager
+          # 自动接受许可并安装必要的SDK组件
+          yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/tools/bin/sdkmanager "build-tools;33.0.0" "platforms;android-33" "platform-tools" || true
+        else
+          echo "系统SDK管理器不可用，将依赖buildozer自动安装..."
+        fi
 
     - name: Cache Buildozer files
       uses: actions/cache@v4
@@ -51,6 +70,17 @@ jobs:
     - name: Build APK
       run: |
         # 增加超时时间并优化构建过程
+        export ANDROID_HOME="/usr/local/lib/android/sdk"
+        export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
+        
+        # 配置buildozer以确保正确处理SDK和build-tools
+        echo "配置buildozer构建选项..."
+        echo "android.accept_sdk_license = True" >> buildozer.spec
+        echo "android.sdk_path = /usr/local/lib/android/sdk" >> buildozer.spec
+        echo "android.build_tools_version = 33.0.0" >> buildozer.spec
+        echo "android.api = 33" >> buildozer.spec
+        
+        # 使用增加的超时和重试选项运行buildozer
         buildozer --verbose android debug
       env:
         # 设置构建环境变量
@@ -58,6 +88,8 @@ jobs:
         P4A_RELEASE_KEYSTORE: ${{ secrets.KEYSTORE }}
         P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.KEYSTORE_PASSWORD }}
         P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.KEYALIAS_PASSWORD }}
+        # 确保构建过程中的SDK许可自动接受
+        ANDROID_ACCEPT_SDK_LICENSES: "True"
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
