@@ -1,79 +1,59 @@
 [app]
-# 应用标题和包名
 title = 减肥体重记录器
 package.name = weighttracker
 package.domain = org.example
-
-# 源文件配置
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,ttf,txt
-source.exclude_dirs = tests, bin, venv, docs, .git, __pycache__
+source.include_exts = py,png,jpg,kv,atlas,ttf,txt,csv,xlsx,json
+
+# 排除不需要的文件
+source.exclude_dirs = venv,.git,__pycache__,.idea
 source.exclude_exts = spec,pyc,pyo
 
-# 主程序入口
-version = 1.0
+# 确保必要的文件被包含
+source.include_patterns = weighttracker.kv,*.db,*.txt
 main = main.py
+version = 1.0
 
-# 要求配置 - 简化依赖，避免冲突
-requirements = 
-    python3,
-    kivy==2.1.0,
-    android,
-    pyjnius,
-    openssl,
-    sqlite3,
-    requests,
-    pillow
-
-# Android配置 - 使用兼容版本
-android.api = 33
+# Android 配置 - 更新到匹配工作流的版本
+android.api = 34
 android.minapi = 21
-android.sdk = 33
-android.ndk = 25b
-android.gradle_dependencies = 'com.android.tools.build:gradle:7.2.0'
+android.targetapi = 34
+android.sdk_version = 34
+android.ndk_api = 21
 android.allow_backup = True
 android.enable_androidx = True
+android.build_tools_version = 34.0.0
 
 # 权限配置
-android.permissions = 
-    INTERNET,
-    WRITE_EXTERNAL_STORAGE,
-    READ_EXTERNAL_STORAGE,
-    ACCESS_NETWORK_STATE
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
 
-# 构建工具版本
-android.build_tools = 33.0.0
-
-# 架构配置
-android.arch = arm64-v8a,armeabi-v7a
+# 应用图标
+icon.filename = icon.png
+presplash.filename = presplash.png
 
 # 应用配置
 orientation = portrait
 fullscreen = 0
 
-# 图标和启动画面
-icon.filename = %(source.dir)s/icon.png
-presplash.filename = %(source.dir)s/presplash.png
+# 依赖配置 - 使用更稳定的版本
+requirements = python3,kivy==2.1.0,android,pyjnius==1.5.0,pandas==1.5.3,openpyxl==3.0.10,pillow
 
-# 日志级别
-log_level = 2
+# 优化设置
+android.no_debug_bridge = True
+android.archs = arm64-v8a,armeabi-v7a
+android.add_src = .
 
 # 构建配置
 build_type = debug
 p4a.branch = master
 
-# 优化设置
-android.private_storage = True
-android.accept_sdk_license = True
-android.skip_compile_pyo = False
+# 使用更兼容的gradle配置
+android.gradle_plugin = 7.2.0
+android.gradle_version = 7.5
+
+log_level = 2
 
 [buildozer]
-# Buildozer配置
 log_level = 2
-warn_on_root = 1
 build_dir = .buildozer
 bin_dir = ./bin
-
-# 允许覆盖默认的SDK路径
-android.sdk_path = /usr/local/lib/android/sdk
-android.ndk_path = /usr/local/lib/android/sdk/ndk/25b
