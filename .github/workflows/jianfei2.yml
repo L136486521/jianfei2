@@ -148,6 +148,53 @@ jobs:
         echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
         echo "PATH: $PATH"
         
+        # 检查buildozer目录结构
+        echo "检查buildozer目录结构..."
+        mkdir -p ~/.buildozer/android/platform
+        ls -la ~/.buildozer/ || echo "buildozer目录不存在"
+        ls -la ~/.buildozer/android/ || echo "buildozer/android目录不存在"
+        ls -la ~/.buildozer/android/platform/ || echo "buildozer/android/platform目录不存在"
+        
+        # 确保buildozer使用的SDK路径存在
+        echo "创建buildozer期望的SDK路径..."
+        mkdir -p ~/.buildozer/android/platform/android-sdk
+        mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools
+        
+        # 复制build-tools到buildozer期望的位置
+        echo "复制build-tools到buildozer期望的位置..."
+        if [ -d "$ANDROID_HOME/build-tools/33.0.0" ]; then
+          cp -r "$ANDROID_HOME/build-tools/33.0.0" ~/.buildozer/android/platform/android-sdk/build-tools/
+          echo "✅ 已复制build-tools/33.0.0到buildozer期望的位置"
+        else
+          echo "❌ build-tools/33.0.0目录不存在，尝试查找其他版本..."
+          ls -la "$ANDROID_HOME/build-tools/"
+        fi
+        
+        # 确保aidl工具具有执行权限
+        echo "确保aidl工具具有执行权限..."
+        AIDL_PATH=$(find ~/.buildozer/android/platform/android-sdk -name "aidl" -type f 2>/dev/null | head -1)
+        if [ -f "$AIDL_PATH" ]; then
+          chmod +x "$AIDL_PATH"
+          echo "✅ 已为aidl工具添加执行权限: $AIDL_PATH"
+        else
+          echo "❌ 未找到aidl工具，尝试从ANDROID_HOME复制..."
+          AIDL_PATH_FROM_HOME=$(find "$ANDROID_HOME" -name "aidl" -type f 2>/dev/null | head -1)
+          if [ -f "$AIDL_PATH_FROM_HOME" ]; then
+            cp "$AIDL_PATH_FROM_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/
+            chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl
+            echo "✅ 已从ANDROID_HOME复制aidl工具到buildozer期望的位置"
+          else
+            echo "❌ 未找到aidl工具，尝试创建软链接..."
+            AIDL3_PATH=$(find "$ANDROID_HOME" -name "aidl3" -type f 2>/dev/null | head -1)
+            if [ -f "$AIDL3_PATH" ]; then
+              ln -sf "$AIDL3_PATH" ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl
+              echo "✅ 已创建aidl软链接指向aidl3"
+            else
+              echo "⚠️  未找到aidl或aidl3工具"
+            fi
+          fi
+        fi
+        
         # 再次检查关键工具
         echo "构建前再次检查关键工具..."
         for tool in sdkmanager aidl zipalign aapt; do
@@ -156,13 +203,16 @@ jobs:
           else
             echo "❌ $tool工具未找到"
             # 查找工具可能的位置
+            echo "正在查找$tool工具..."
             find "$ANDROID_HOME" -name "$tool" -type f
+            find ~/.buildozer/android/platform/android-sdk -name "$tool" -type f
           fi
         done
         
-        # 确保build-tools目录存在
-        echo "确保build-tools目录存在..."
-        mkdir -p "$ANDROID_HOME/build-tools/33.0.0"
+        # 检查build-tools目录
+        echo "检查buildozer期望的build-tools目录..."
+        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/ || echo "buildozer build-tools目录不存在"
+        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/ || echo "buildozer build-tools/33.0.0目录不存在"
         
         # 设置详细日志级别以便更好地调试
         export BUILDOZER_LOG_LEVEL=2
