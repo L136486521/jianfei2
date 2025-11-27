@@ -38,7 +38,7 @@ jobs:
       uses: android-actions/setup-android@v3
       with:
         sdk-version: '33'
-        build-tools-version: '33.0.0'
+        build-tools-version: '34.0.0'
         ndk-version: '21.4.7075529'
     
     - name: Verify Android SDK installation
@@ -55,7 +55,7 @@ jobs:
         # 检查build-tools目录
         echo "build-tools目录:"
         ls -la "$ANDROID_HOME/build-tools/" || echo "build-tools目录不存在"
-        ls -la "$ANDROID_HOME/build-tools/33.0.0/" || echo "build-tools/33.0.0目录不存在"
+        ls -la "$ANDROID_HOME/build-tools/34.0.0/" || echo "build-tools/34.0.0目录不存在"
         
         # 检查关键工具
         echo "检查关键构建工具..."
@@ -99,13 +99,13 @@ jobs:
           else
             echo "⚠️  未找到aidl工具，尝试创建软链接..."
             # 检查build-tools目录下是否有aidl工具
-            AIDL_CANDIDATES=("$ANDROID_HOME/build-tools/33.0.0/aidl" "$ANDROID_HOME/build-tools/33.0.0/aidl3")
+            AIDL_CANDIDATES=("$ANDROID_HOME/build-tools/34.0.0/aidl" "$ANDROID_HOME/build-tools/34.0.0/aidl3")
             for candidate in "${AIDL_CANDIDATES[@]}"; do
               if [ -f "$candidate" ]; then
                 echo "找到aidl候选工具: $candidate"
                 # 创建软链接
-                ln -sf "$candidate" "$ANDROID_HOME/build-tools/33.0.0/aidl"
-                export PATH="$ANDROID_HOME/build-tools/33.0.0:$PATH"
+                ln -sf "$candidate" "$ANDROID_HOME/build-tools/34.0.0/aidl"
+                export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
                 echo "已创建aidl软链接并添加到PATH"
                 break
               fi
@@ -127,7 +127,7 @@ jobs:
         # 添加配置
         echo "android.accept_sdk_license = True" >> buildozer.spec
         echo "android.sdk_path = $ANDROID_HOME" >> buildozer.spec
-        echo "android.build_tools_version = 33.0.0" >> buildozer.spec
+        echo "android.build_tools_version = 34.0.0" >> buildozer.spec
         echo "android.api = 33" >> buildozer.spec
         echo "android.ndk_api = 21" >> buildozer.spec
         
@@ -163,16 +163,16 @@ jobs:
         # 复制整个SDK目录结构到buildozer期望的位置
         echo "复制整个SDK目录结构到buildozer期望的位置..."
         # 复制build-tools
-        if [ -d "$ANDROID_HOME/build-tools/33.0.0" ]; then
+        if [ -d "$ANDROID_HOME/build-tools/34.0.0" ]; then
           # 确保目标目录存在
-          mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0
+          mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0
           # 复制所有内容
-          cp -r "$ANDROID_HOME/build-tools/33.0.0/"* ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/
-          echo "✅ 已复制build-tools/33.0.0到buildozer期望的位置"
+          cp -r "$ANDROID_HOME/build-tools/34.0.0/"* ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
+          echo "✅ 已复制build-tools/34.0.0到buildozer期望的位置"
           # 检查复制结果
-          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/
+          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
         else
-          echo "❌ build-tools/33.0.0目录不存在，尝试查找其他版本..."
+          echo "❌ build-tools/34.0.0目录不存在，尝试查找其他版本..."
           ls -la "$ANDROID_HOME/build-tools/"
         fi
         
@@ -186,20 +186,20 @@ jobs:
         echo "在ANDROID_HOME中找到的aidl3工具: $AIDL3_HOME"
         
         # 确保buildozer的build-tools目录中有aidl工具
-        BUILDOZER_AIDL_PATH="~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl"
-        BUILDOZER_AIDL3_PATH="~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl3"
+        BUILDOZER_AIDL_PATH="~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl"
+        BUILDOZER_AIDL3_PATH="~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3"
         
         # 复制aidl或aidl3到buildozer目录
         if [ -f "$AIDL_HOME" ]; then
-          cp "$AIDL_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl
+          cp "$AIDL_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
+          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl
           echo "✅ 已从ANDROID_HOME复制aidl工具到buildozer期望的位置"
         elif [ -f "$AIDL3_HOME" ]; then
           # 如果只有aidl3，复制并创建aidl软链接
-          cp "$AIDL3_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl3
+          cp "$AIDL3_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
+          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3
           # 创建软链接
-          ln -sf ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl3 ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl
+          ln -sf ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl
           echo "✅ 已从ANDROID_HOME复制aidl3工具到buildozer期望的位置，并创建aidl软链接"
         else
           echo "❌ 未找到aidl或aidl3工具"
@@ -207,8 +207,8 @@ jobs:
         
         # 确保aidl工具具有执行权限
         echo "确保aidl工具具有执行权限..."
-        chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl 2>/dev/null || true
-        chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/aidl3 2>/dev/null || true
+        chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl 2>/dev/null || true
+        chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 2>/dev/null || true
         
         # 再次检查关键工具
         echo "构建前再次检查关键工具..."
@@ -227,13 +227,13 @@ jobs:
         # 检查build-tools目录
         echo "检查buildozer期望的build-tools目录..."
         ls -la ~/.buildozer/android/platform/android-sdk/build-tools/ || echo "buildozer build-tools目录不存在"
-        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.0/ || echo "buildozer build-tools/33.0.0目录不存在"
+        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/ || echo "buildozer build-tools/34.0.0目录不存在"
         
         # 明确设置buildozer使用的环境变量
         echo "设置buildozer特定的环境变量..."
         export ANDROID_SDK_HOME="$ANDROID_HOME"
         export ANDROID_SDK_ROOT="$ANDROID_HOME"
-        export PATH="$PATH:$ANDROID_HOME/build-tools/33.0.0:$ANDROID_HOME/platform-tools"
+        export PATH="$PATH:$ANDROID_HOME/build-tools/34.0.0:$ANDROID_HOME/platform-tools"
         
         # 显示当前目录和文件
         echo "当前目录内容:"
