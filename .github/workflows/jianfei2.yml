@@ -275,6 +275,15 @@ jobs:
           echo "已创建platform-tools符号链接到buildozer期望的位置"
         fi
         
+        # 创建tools符号链接指向cmdline-tools/latest，解决旧路径访问问题
+        if [ -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+          if [ -L ~/.buildozer/android/platform/android-sdk/tools ]; then
+            rm ~/.buildozer/android/platform/android-sdk/tools
+          fi
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest" ~/.buildozer/android/platform/android-sdk/tools
+          echo "已创建tools符号链接指向cmdline-tools/latest"
+        fi
+        
         # 显示配置信息
         echo "Buildozer配置完成:"
         echo "ANDROID_HOME: $ANDROID_HOME"
@@ -311,6 +320,15 @@ jobs:
             echo "✅ 已创建$dir符号链接到buildozer期望的位置"
           fi
         done
+        
+        # 创建tools符号链接指向cmdline-tools/latest，解决旧路径访问问题
+        if [ -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+          if [ -L ~/.buildozer/android/platform/android-sdk/tools ]; then
+            rm ~/.buildozer/android/platform/android-sdk/tools
+          fi
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest" ~/.buildozer/android/platform/android-sdk/tools
+          echo "✅ 已创建tools符号链接指向cmdline-tools/latest"
+        fi
         
         # 检查符号链接状态
         echo "\n符号链接状态:"
@@ -359,12 +377,30 @@ jobs:
         if $SDKMANAGER_FOUND; then
           echo "✅ 验证sdkmanager可执行:"
           sdkmanager --version 2>&1 | head -1
+          
+          # 验证旧路径是否可访问（Buildozer会查找这个路径）
+          OLD_SDKMANAGER_PATH="~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+          if [ -f "$OLD_SDKMANAGER_PATH" ]; then
+            echo "✅ 旧路径sdkmanager可访问: $OLD_SDKMANAGER_PATH"
+            echo "   旧路径sdkmanager版本: $($OLD_SDKMANAGER_PATH --version 2>&1 | head -1)"
+          else
+            echo "⚠️  旧路径sdkmanager不可直接访问，但已通过符号链接重定向"
+            # 检查符号链接状态
+            echo "   检查tools目录符号链接:"
+            ls -la ~/.buildozer/android/platform/android-sdk/tools
+            echo "   检查旧路径目录结构:"
+            ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/ 2>/dev/null || echo "   旧路径bin目录不存在"
+          fi
         else
           echo "❌ 无法找到或修复sdkmanager工具"
           echo "ANDROID_HOME目录结构:"
           ls -la "$ANDROID_HOME"
           echo "cmdline-tools目录内容:"
           ls -la "$ANDROID_HOME/cmdline-tools/" 2>/dev/null || echo "cmdline-tools目录不存在"
+          # 检查旧路径相关信息
+          echo "旧路径相关信息:"
+          echo "   tools目录符号链接:"
+          ls -la ~/.buildozer/android/platform/android-sdk/tools 2>/dev/null || echo "   tools目录不存在"
           exit 1
         fi
         
