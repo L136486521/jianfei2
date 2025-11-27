@@ -45,36 +45,68 @@ jobs:
     - name: Verify Android SDK installation
       run: |
         # 显示SDK配置信息
+        echo "SDK配置信息:"
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
         echo "PATH: $PATH"
         
         # 显示SDK目录结构
-        echo "SDK目录结构:"
+        echo "\nSDK目录结构:"
         ls -la "$ANDROID_HOME"
         
+        # 检查cmdline-tools目录（包含sdkmanager）
+        echo "\ncmdline-tools目录:"
+        ls -la "$ANDROID_HOME/cmdline-tools/" || echo "cmdline-tools目录不存在"
+        ls -la "$ANDROID_HOME/cmdline-tools/latest/" || echo "cmdline-tools/latest目录不存在"
+        ls -la "$ANDROID_HOME/cmdline-tools/latest/bin/" || echo "cmdline-tools/latest/bin目录不存在"
+        
         # 检查build-tools目录
-        echo "build-tools目录:"
+        echo "\nbuild-tools目录:"
         ls -la "$ANDROID_HOME/build-tools/" || echo "build-tools目录不存在"
         ls -la "$ANDROID_HOME/build-tools/34.0.0/" || echo "build-tools/34.0.0目录不存在"
         
         # 检查关键工具
-        echo "检查关键构建工具..."
+        echo "\n检查关键构建工具..."
         for tool in sdkmanager aidl zipalign aapt; do
           if command -v $tool &> /dev/null; then
             echo "✅ $tool工具已找到: $(command -v $tool)"
+            # 显示工具版本（如果支持）
+            if [ "$tool" = "sdkmanager" ]; then
+              echo "   sdkmanager版本: $($tool --version 2>&1 | head -1)"
+            fi
           else
             echo "❌ $tool工具未找到"
             # 查找工具可能的位置
-            echo "正在查找$tool工具..."
+            echo "   正在查找$tool工具..."
             find "$ANDROID_HOME" -name "$tool" -type f
           fi
         done
         
         # 确保java版本正确
-        echo "Java版本信息:"
+        echo "\nJava版本信息:"
         java -version
         javac -version
+        
+        # 验证sdkmanager可执行
+        echo "\n验证sdkmanager可执行:"
+        if [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+          echo "✅ sdkmanager文件存在: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "   文件权限: $(ls -l "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager")"
+          # 测试sdkmanager命令
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version 2>&1 | head -1
+        else
+          echo "❌ sdkmanager文件不存在"
+        fi
+        
+        # 确保sdkmanager所在目录在PATH中
+        echo "\n确保sdkmanager所在目录在PATH中:"
+        if [[ "$PATH" == *"cmdline-tools/latest/bin"* ]]; then
+          echo "✅ sdkmanager所在目录已在PATH中"
+        else
+          echo "⚠️  sdkmanager所在目录不在PATH中，添加到PATH"
+          export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
+          echo "   新PATH: $PATH"
+        fi
 
     - name: Configure Buildozer
       run: |
@@ -186,38 +218,83 @@ jobs:
         
         # 检查sdkmanager工具
         echo "检查sdkmanager工具..."
-        if ! command -v sdkmanager &> /dev/null; then
+        SDKMANAGER_FOUND=false
+        
+        # 首先检查命令是否可用
+        if command -v sdkmanager &> /dev/null; then
+          echo "✅ sdkmanager工具已找到: $(command -v sdkmanager)"
+          SDKMANAGER_FOUND=true
+        else
           echo "❌ sdkmanager工具未找到，尝试修复..."
+          
           # 查找sdkmanager工具可能的位置
           SDKMANAGER_PATH=$(find "$ANDROID_HOME" -name "sdkmanager" -type f 2>/dev/null | head -1)
+          
           if [ -f "$SDKMANAGER_PATH" ]; then
             echo "找到sdkmanager工具: $SDKMANAGER_PATH"
             # 将sdkmanager工具所在目录添加到PATH
             export PATH="$(dirname "$SDKMANAGER_PATH"):$PATH"
             echo "已将sdkmanager工具所在目录添加到PATH"
+            SDKMANAGER_FOUND=true
           else
-            echo "❌ 未找到sdkmanager工具"
-            # 显示ANDROID_HOME目录结构，查找cmdline-tools
-            echo "ANDROID_HOME目录结构:"
-            ls -la "$ANDROID_HOME"
-            ls -la "$ANDROID_HOME/cmdline-tools/" 2>/dev/null || echo "cmdline-tools目录不存在"
+            # 检查常见位置
+            COMMON_SDKMANAGER_PATHS=("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/cmdline-tools/bin/sdkmanager")
+            for path in "${COMMON_SDKMANAGER_PATHS[@]}"; do
+              if [ -f "$path" ]; then
+                echo "找到sdkmanager工具: $path"
+                export PATH="$(dirname "$path"):$PATH"
+                echo "已将sdkmanager工具所在目录添加到PATH"
+                SDKMANAGER_FOUND=true
+                break
+              fi
+            done
           fi
+        fi
+        
+        # 验证sdkmanager可执行
+        if $SDKMANAGER_FOUND; then
+          echo "✅ 验证sdkmanager可执行:"
+          sdkmanager --version 2>&1 | head -1
         else
-          echo "✅ sdkmanager工具已找到: $(command -v sdkmanager)"
+          echo "❌ 无法找到或修复sdkmanager工具"
+          echo "ANDROID_HOME目录结构:"
+          ls -la "$ANDROID_HOME"
+          echo "cmdline-tools目录内容:"
+          ls -la "$ANDROID_HOME/cmdline-tools/" 2>/dev/null || echo "cmdline-tools目录不存在"
+          exit 1
+        fi
+        
+        # 确保sdkmanager所在目录在PATH中
+        if [[ "$PATH" == *"cmdline-tools"* ]]; then
+          echo "✅ sdkmanager所在目录已在PATH中"
+        else
+          echo "⚠️  sdkmanager所在目录不在PATH中，手动添加"
+          export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
         fi
         
         # 再次检查关键工具
         echo "构建前再次检查关键工具..."
+        ALL_TOOLS_FOUND=true
+        
         for tool in sdkmanager aidl zipalign aapt; do
           if command -v $tool &> /dev/null; then
             echo "✅ $tool工具已找到: $(command -v $tool)"
           else
             echo "❌ $tool工具未找到"
+            ALL_TOOLS_FOUND=false
             # 查找工具可能的位置
             echo "正在查找$tool工具..."
             find "$ANDROID_HOME" -name "$tool" -type f 2>/dev/null
           fi
         done
+        
+        # 如果有工具未找到，退出构建
+        if ! $ALL_TOOLS_FOUND; then
+          echo "❌ 关键构建工具未找到，无法继续构建"
+          exit 1
+        fi
+        
+        echo "✅ 所有关键构建工具已找到，可以继续构建"
         
         # 明确设置buildozer使用的环境变量
         echo "设置buildozer特定的环境变量..."
