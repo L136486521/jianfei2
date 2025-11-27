@@ -22,9 +22,10 @@ android.sdk_version = 33
 android.ndk_api = 21
 android.allow_backup = True
 android.enable_androidx = True
-android.build_tools_version = 33.0.0
+android.build_tools_version = 34.0.0
 android.accept_sdk_license = True
-android.sdk_path = $HOME/android-sdk
+# 使用环境变量或默认值，避免硬编码特定路径
+android.sdk_path =
 
 # 权限配置
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,WAKE_LOCK
