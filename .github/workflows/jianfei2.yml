@@ -42,6 +42,11 @@ jobs:
         ndk-version: '21.4.7075529'
         cmdline-tools-version: 'latest'
     
+    - name: Install Android API Level 31
+      run: |
+        # 安装API级别31
+        sdkmanager "platforms;android-31" --verbose
+    
     - name: Verify Android SDK installation
       run: |
         # 显示SDK配置信息
