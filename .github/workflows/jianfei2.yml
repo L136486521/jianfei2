@@ -283,7 +283,6 @@ jobs:
           ln -sf "$ANDROID_HOME/cmdline-tools/latest" ~/.buildozer/android/platform/android-sdk/tools
           echo "已创建tools符号链接指向cmdline-tools/latest"
         fi
-        
         # 显示配置信息
         echo "Buildozer配置完成:"
         echo "ANDROID_HOME: $ANDROID_HOME"
