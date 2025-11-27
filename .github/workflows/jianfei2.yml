@@ -40,6 +40,7 @@ jobs:
         sdk-version: '33'
         build-tools-version: '34.0.0'
         ndk-version: '21.4.7075529'
+        cmdline-tools-version: 'latest'
     
     - name: Verify Android SDK installation
       run: |
@@ -150,65 +151,29 @@ jobs:
         
         # 检查buildozer目录结构
         echo "检查buildozer目录结构..."
-        mkdir -p ~/.buildozer/android/platform
-        ls -la ~/.buildozer/ || echo "buildozer目录不存在"
-        ls -la ~/.buildozer/android/ || echo "buildozer/android目录不存在"
-        ls -la ~/.buildozer/android/platform/ || echo "buildozer/android/platform目录不存在"
+        mkdir -p ~/.buildozer
         
-        # 确保buildozer使用的SDK路径存在
-        echo "创建buildozer期望的SDK路径..."
-        mkdir -p ~/.buildozer/android/platform/android-sdk
-        mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools
-        
-        # 复制整个SDK目录结构到buildozer期望的位置
-        echo "复制整个SDK目录结构到buildozer期望的位置..."
-        # 复制build-tools
-        if [ -d "$ANDROID_HOME/build-tools/34.0.0" ]; then
-          # 确保目标目录存在
-          mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0
-          # 复制所有内容
-          cp -r "$ANDROID_HOME/build-tools/34.0.0/"* ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
-          echo "✅ 已复制build-tools/34.0.0到buildozer期望的位置"
-          # 检查复制结果
-          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
+        # 检查sdkmanager工具
+        echo "检查sdkmanager工具..."
+        if ! command -v sdkmanager &> /dev/null; then
+          echo "❌ sdkmanager工具未找到，尝试修复..."
+          # 查找sdkmanager工具可能的位置
+          SDKMANAGER_PATH=$(find "$ANDROID_HOME" -name "sdkmanager" -type f 2>/dev/null | head -1)
+          if [ -f "$SDKMANAGER_PATH" ]; then
+            echo "找到sdkmanager工具: $SDKMANAGER_PATH"
+            # 将sdkmanager工具所在目录添加到PATH
+            export PATH="$(dirname "$SDKMANAGER_PATH"):$PATH"
+            echo "已将sdkmanager工具所在目录添加到PATH"
+          else
+            echo "❌ 未找到sdkmanager工具"
+            # 显示ANDROID_HOME目录结构，查找cmdline-tools
+            echo "ANDROID_HOME目录结构:"
+            ls -la "$ANDROID_HOME"
+            ls -la "$ANDROID_HOME/cmdline-tools/" 2>/dev/null || echo "cmdline-tools目录不存在"
+          fi
         else
-          echo "❌ build-tools/34.0.0目录不存在，尝试查找其他版本..."
-          ls -la "$ANDROID_HOME/build-tools/"
+          echo "✅ sdkmanager工具已找到: $(command -v sdkmanager)"
         fi
-        
-        # 检查并修复aidl工具
-        echo "检查并修复aidl工具..."
-        # 首先查找ANDROID_HOME中的aidl工具
-        AIDL_HOME=$(find "$ANDROID_HOME" -name "aidl" -type f 2>/dev/null | head -1)
-        AIDL3_HOME=$(find "$ANDROID_HOME" -name "aidl3" -type f 2>/dev/null | head -1)
-        
-        echo "在ANDROID_HOME中找到的aidl工具: $AIDL_HOME"
-        echo "在ANDROID_HOME中找到的aidl3工具: $AIDL3_HOME"
-        
-        # 确保buildozer的build-tools目录中有aidl工具
-        BUILDOZER_AIDL_PATH="~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl"
-        BUILDOZER_AIDL3_PATH="~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3"
-        
-        # 复制aidl或aidl3到buildozer目录
-        if [ -f "$AIDL_HOME" ]; then
-          cp "$AIDL_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl
-          echo "✅ 已从ANDROID_HOME复制aidl工具到buildozer期望的位置"
-        elif [ -f "$AIDL3_HOME" ]; then
-          # 如果只有aidl3，复制并创建aidl软链接
-          cp "$AIDL3_HOME" ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3
-          # 创建软链接
-          ln -sf ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl
-          echo "✅ 已从ANDROID_HOME复制aidl3工具到buildozer期望的位置，并创建aidl软链接"
-        else
-          echo "❌ 未找到aidl或aidl3工具"
-        fi
-        
-        # 确保aidl工具具有执行权限
-        echo "确保aidl工具具有执行权限..."
-        chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl 2>/dev/null || true
-        chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 2>/dev/null || true
         
         # 再次检查关键工具
         echo "构建前再次检查关键工具..."
@@ -220,20 +185,14 @@ jobs:
             # 查找工具可能的位置
             echo "正在查找$tool工具..."
             find "$ANDROID_HOME" -name "$tool" -type f
-            find ~/.buildozer/android/platform/android-sdk -name "$tool" -type f
           fi
         done
-        
-        # 检查build-tools目录
-        echo "检查buildozer期望的build-tools目录..."
-        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/ || echo "buildozer build-tools目录不存在"
-        ls -la ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/ || echo "buildozer build-tools/34.0.0目录不存在"
         
         # 明确设置buildozer使用的环境变量
         echo "设置buildozer特定的环境变量..."
         export ANDROID_SDK_HOME="$ANDROID_HOME"
         export ANDROID_SDK_ROOT="$ANDROID_HOME"
-        export PATH="$PATH:$ANDROID_HOME/build-tools/34.0.0:$ANDROID_HOME/platform-tools"
+        export PATH="$PATH:$ANDROID_HOME/build-tools/34.0.0:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin"
         
         # 显示当前目录和文件
         echo "当前目录内容:"
