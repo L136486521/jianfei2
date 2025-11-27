@@ -153,6 +153,37 @@ jobs:
         echo "检查buildozer目录结构..."
         mkdir -p ~/.buildozer
         
+        # 创建buildozer期望的SDK路径并复制build-tools
+        echo "创建buildozer期望的SDK路径并复制build-tools..."
+        mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools
+        
+        # 复制系统SDK中的build-tools到buildozer期望的位置
+        if [ -d "$ANDROID_HOME/build-tools/34.0.0" ]; then
+          cp -r "$ANDROID_HOME/build-tools/34.0.0" ~/.buildozer/android/platform/android-sdk/build-tools/
+          echo "✅ 已复制build-tools/34.0.0到buildozer期望的位置"
+          # 检查复制结果
+          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
+          
+          # 确保aidl工具具有执行权限
+          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl 2>/dev/null || true
+          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 2>/dev/null || true
+          
+          # 检查aidl工具是否存在
+          if [ -f ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl ]; then
+            echo "✅ aidl工具已存在于buildozer期望的位置"
+            echo "aidl工具权限: $(ls -l ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl)"
+          elif [ -f ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 ]; then
+            echo "✅ aidl3工具已存在于buildozer期望的位置，创建aidl软链接"
+            ln -sf ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl
+            echo "aidl软链接已创建: $(ls -l ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl)"
+          else
+            echo "❌ 未在buildozer期望的位置找到aidl或aidl3工具"
+          fi
+        else
+          echo "❌ build-tools/34.0.0目录不存在，尝试查找其他版本..."
+          ls -la "$ANDROID_HOME/build-tools/"
+        fi
+        
         # 检查sdkmanager工具
         echo "检查sdkmanager工具..."
         if ! command -v sdkmanager &> /dev/null; then
