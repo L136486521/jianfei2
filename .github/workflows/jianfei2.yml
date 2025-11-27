@@ -60,14 +60,24 @@ jobs:
         ls -la "$ANDROID_HOME/cmdline-tools/latest/" || echo "cmdline-tools/latest目录不存在"
         ls -la "$ANDROID_HOME/cmdline-tools/latest/bin/" || echo "cmdline-tools/latest/bin目录不存在"
         
-        # 检查build-tools目录
+        # 检查所有build-tools版本
         echo "\nbuild-tools目录:"
         ls -la "$ANDROID_HOME/build-tools/" || echo "build-tools目录不存在"
-        ls -la "$ANDROID_HOME/build-tools/34.0.0/" || echo "build-tools/34.0.0目录不存在"
+        
+        # 显示所有build-tools版本的目录结构
+        for build_tool_version in $(ls -1 "$ANDROID_HOME/build-tools/" 2>/dev/null || echo ""); do
+          echo "\nbuild-tools/$build_tool_version目录:"
+          ls -la "$ANDROID_HOME/build-tools/$build_tool_version/" || echo "build-tools/$build_tool_version目录不存在"
+        done
         
         # 检查关键工具
         echo "\n检查关键构建工具..."
-        for tool in sdkmanager aidl zipalign aapt; do
+        
+        # 定义关键工具列表
+        KEY_TOOLS=("sdkmanager" "aidl" "zipalign" "aapt")
+        
+        # 检查并修复所有关键工具
+        for tool in "${KEY_TOOLS[@]}"; do
           if command -v $tool &> /dev/null; then
             echo "✅ $tool工具已找到: $(command -v $tool)"
             # 显示工具版本（如果支持）
@@ -78,7 +88,34 @@ jobs:
             echo "❌ $tool工具未找到"
             # 查找工具可能的位置
             echo "   正在查找$tool工具..."
-            find "$ANDROID_HOME" -name "$tool" -type f
+            
+            # 查找所有可能的工具位置
+            TOOL_PATHS=$(find "$ANDROID_HOME" -name "$tool" -type f 2>/dev/null)
+            
+            if [ -n "$TOOL_PATHS" ]; then
+              echo "   找到$tool工具的位置:"
+              echo "$TOOL_PATHS"
+              
+              # 获取第一个找到的工具路径
+              FIRST_TOOL_PATH=$(echo "$TOOL_PATHS" | head -1)
+              TOOL_DIR=$(dirname "$FIRST_TOOL_PATH")
+              
+              # 确保工具具有执行权限
+              chmod +x "$FIRST_TOOL_PATH" 2>/dev/null || echo "   无法设置$tool工具的执行权限"
+              
+              # 将工具所在目录添加到PATH
+              export PATH="$TOOL_DIR:$PATH"
+              echo "   已将$tool工具所在目录($TOOL_DIR)添加到PATH"
+              
+              # 再次检查工具是否可用
+              if command -v $tool &> /dev/null; then
+                echo "   ✅ $tool工具现在可用: $(command -v $tool)"
+              else
+                echo "   ❌ 即使添加到PATH，$tool工具仍然不可用"
+              fi
+            else
+              echo "   ❌ 未找到$tool工具"
+            fi
           fi
         done
         
@@ -92,6 +129,8 @@ jobs:
         if [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
           echo "✅ sdkmanager文件存在: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           echo "   文件权限: $(ls -l "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager")"
+          # 确保sdkmanager有执行权限
+          chmod +x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 2>/dev/null || echo "   无法设置sdkmanager的执行权限"
           # 测试sdkmanager命令
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version 2>&1 | head -1
         else
@@ -107,6 +146,17 @@ jobs:
           export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
           echo "   新PATH: $PATH"
         fi
+        
+        # 确保所有build-tools目录都在PATH中
+        echo "\n确保所有build-tools目录都在PATH中:"
+        for build_tool_version in $(ls -1 "$ANDROID_HOME/build-tools/" 2>/dev/null || echo ""); do
+          build_tool_dir="$ANDROID_HOME/build-tools/$build_tool_version"
+          if [[ "$PATH" != *"$build_tool_dir"* ]]; then
+            export PATH="$PATH:$build_tool_dir"
+            echo "   添加$build_tool_dir到PATH"
+          fi
+        done
+        echo "   最终PATH: $PATH"
 
     - name: Configure Buildozer
       run: |
@@ -118,35 +168,69 @@ jobs:
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
         
-        # 检查并修复aidl工具
-        echo "检查并修复aidl工具..."
-        if ! command -v aidl &> /dev/null; then
-          echo "❌ aidl工具未找到，尝试修复..."
-          # 查找aidl工具可能的位置
-          AIDL_PATH=$(find "$ANDROID_HOME" -name "aidl" -type f 2>/dev/null | head -1)
-          if [ -f "$AIDL_PATH" ]; then
-            echo "找到aidl工具: $AIDL_PATH"
-            # 将aidl工具所在目录添加到PATH
-            export PATH="$(dirname "$AIDL_PATH"):$PATH"
-            echo "已将aidl工具所在目录添加到PATH"
+        # 检查并修复所有关键工具
+        echo "检查并修复所有关键工具..."
+        
+        # 定义关键工具列表
+        KEY_TOOLS=("aidl" "zipalign" "aapt")
+        
+        for tool in "${KEY_TOOLS[@]}"; do
+          if ! command -v $tool &> /dev/null; then
+            echo "❌ $tool工具未找到，尝试修复..."
+            
+            # 查找工具可能的位置
+            TOOL_PATH=$(find "$ANDROID_HOME" -name "$tool" -type f 2>/dev/null | head -1)
+            
+            if [ -f "$TOOL_PATH" ]; then
+              echo "找到$tool工具: $TOOL_PATH"
+              
+              # 确保工具具有执行权限
+              chmod +x "$TOOL_PATH" 2>/dev/null || echo "无法设置$tool工具的执行权限"
+              
+              # 将工具所在目录添加到PATH
+              export PATH="$(dirname "$TOOL_PATH"):$PATH"
+              echo "已将$tool工具所在目录添加到PATH"
+            else
+              echo "⚠️  未找到$tool工具，检查build-tools目录..."
+              
+              # 检查所有build-tools版本
+              for build_tool_version in $(ls -1 "$ANDROID_HOME/build-tools/" 2>/dev/null || echo ""); do
+                BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/$build_tool_version"
+                
+                # 检查工具是否在build-tools目录中
+                if [ -f "$BUILD_TOOLS_DIR/$tool" ]; then
+                  echo "在$BUILD_TOOLS_DIR中找到$tool工具"
+                  
+                  # 确保工具具有执行权限
+                  chmod +x "$BUILD_TOOLS_DIR/$tool" 2>/dev/null || echo "无法设置$tool工具的执行权限"
+                  
+                  # 将工具所在目录添加到PATH
+                  export PATH="$BUILD_TOOLS_DIR:$PATH"
+                  echo "已将$tool工具所在目录添加到PATH"
+                  break
+                fi
+                
+                # 对于aidl工具，检查aidl3变体
+                if [ "$tool" = "aidl" ] && [ -f "$BUILD_TOOLS_DIR/aidl3" ]; then
+                  echo "在$BUILD_TOOLS_DIR中找到aidl3工具，创建aidl软链接"
+                  
+                  # 确保aidl3具有执行权限
+                  chmod +x "$BUILD_TOOLS_DIR/aidl3" 2>/dev/null || echo "无法设置aidl3工具的执行权限"
+                  
+                  # 创建软链接
+                  ln -sf "$BUILD_TOOLS_DIR/aidl3" "$BUILD_TOOLS_DIR/aidl"
+                  
+                  # 将工具所在目录添加到PATH
+                  export PATH="$BUILD_TOOLS_DIR:$PATH"
+                  echo "已创建aidl软链接并将目录添加到PATH"
+                  break
+                fi
+              done
+            fi
           else
-            echo "⚠️  未找到aidl工具，尝试创建软链接..."
-            # 检查build-tools目录下是否有aidl工具
-            AIDL_CANDIDATES=("$ANDROID_HOME/build-tools/34.0.0/aidl" "$ANDROID_HOME/build-tools/34.0.0/aidl3")
-            for candidate in "${AIDL_CANDIDATES[@]}"; do
-              if [ -f "$candidate" ]; then
-                echo "找到aidl候选工具: $candidate"
-                # 创建软链接
-                ln -sf "$candidate" "$ANDROID_HOME/build-tools/34.0.0/aidl"
-                export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
-                echo "已创建aidl软链接并添加到PATH"
-                break
-              fi
-            done
+            echo "✅ $tool工具已找到: $(command -v $tool)"
           fi
-        else
-          echo "✅ aidl工具已找到: $(command -v aidl)"
-        fi
+        done
         
         # 更新buildozer.spec文件
         echo "更新buildozer.spec文件..."
@@ -167,11 +251,39 @@ jobs:
         # 为buildozer创建环境配置
         mkdir -p ~/.buildozer/android/platform
         
+        # 确保buildozer期望的SDK路径存在
+        mkdir -p ~/.buildozer/android/platform/android-sdk
+        
+        # 创建符号链接，将系统SDK链接到buildozer期望的位置
+        if [ ! -L ~/.buildozer/android/platform/android-sdk/build-tools ]; then
+          ln -sf "$ANDROID_HOME/build-tools" ~/.buildozer/android/platform/android-sdk/build-tools
+          echo "已创建build-tools符号链接到buildozer期望的位置"
+        fi
+        
+        if [ ! -L ~/.buildozer/android/platform/android-sdk/cmdline-tools ]; then
+          ln -sf "$ANDROID_HOME/cmdline-tools" ~/.buildozer/android/platform/android-sdk/cmdline-tools
+          echo "已创建cmdline-tools符号链接到buildozer期望的位置"
+        fi
+        
+        if [ ! -L ~/.buildozer/android/platform/android-sdk/platforms ]; then
+          ln -sf "$ANDROID_HOME/platforms" ~/.buildozer/android/platform/android-sdk/platforms
+          echo "已创建platforms符号链接到buildozer期望的位置"
+        fi
+        
+        if [ ! -L ~/.buildozer/android/platform/android-sdk/platform-tools ]; then
+          ln -sf "$ANDROID_HOME/platform-tools" ~/.buildozer/android/platform/android-sdk/platform-tools
+          echo "已创建platform-tools符号链接到buildozer期望的位置"
+        fi
+        
         # 显示配置信息
         echo "Buildozer配置完成:"
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "PATH: $PATH"
         cat buildozer.spec | grep android.
+        
+        # 显示buildozer目录结构
+        echo "\nbuildozer目录结构:"
+        ls -la ~/.buildozer/android/platform/android-sdk/
 
     - name: Build APK
       run: |
@@ -185,39 +297,27 @@ jobs:
         echo "检查buildozer目录结构..."
         mkdir -p ~/.buildozer
         
-        # 创建buildozer期望的SDK路径并复制build-tools
-        echo "创建buildozer期望的SDK路径并复制build-tools..."
-        mkdir -p ~/.buildozer/android/platform/android-sdk/build-tools
+        # 确保所有符号链接都已创建
+        echo "确保所有符号链接都已创建..."
+        mkdir -p ~/.buildozer/android/platform/android-sdk
         
-        # 复制系统SDK中的build-tools到buildozer期望的位置
-        if [ -d "$ANDROID_HOME/build-tools/34.0.0" ]; then
-          cp -r "$ANDROID_HOME/build-tools/34.0.0" ~/.buildozer/android/platform/android-sdk/build-tools/
-          echo "✅ 已复制build-tools/34.0.0到buildozer期望的位置"
-          # 检查复制结果
-          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/
-          
-          # 确保aidl工具具有执行权限
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl 2>/dev/null || true
-          chmod +x ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 2>/dev/null || true
-          
-          # 检查aidl工具是否存在
-          if [ -f ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl ]; then
-            echo "✅ aidl工具已存在于buildozer期望的位置"
-            echo "aidl工具权限: $(ls -l ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl)"
-          elif [ -f ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 ]; then
-            echo "✅ aidl3工具已存在于buildozer期望的位置，创建aidl软链接"
-            ln -sf ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl3 ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl
-            echo "aidl软链接已创建: $(ls -l ~/.buildozer/android/platform/android-sdk/build-tools/34.0.0/aidl)"
-          else
-            echo "❌ 未在buildozer期望的位置找到aidl或aidl3工具"
+        # 重新创建符号链接，确保它们指向正确的位置
+        for dir in build-tools cmdline-tools platforms platform-tools; do
+          if [ -d "$ANDROID_HOME/$dir" ]; then
+            if [ -L ~/.buildozer/android/platform/android-sdk/$dir ]; then
+              rm ~/.buildozer/android/platform/android-sdk/$dir
+            fi
+            ln -sf "$ANDROID_HOME/$dir" ~/.buildozer/android/platform/android-sdk/$dir
+            echo "✅ 已创建$dir符号链接到buildozer期望的位置"
           fi
-        else
-          echo "❌ build-tools/34.0.0目录不存在，尝试查找其他版本..."
-          ls -la "$ANDROID_HOME/build-tools/"
-        fi
+        done
+        
+        # 检查符号链接状态
+        echo "\n符号链接状态:"
+        ls -la ~/.buildozer/android/platform/android-sdk/
         
         # 检查sdkmanager工具
-        echo "检查sdkmanager工具..."
+        echo "\n检查sdkmanager工具..."
         SDKMANAGER_FOUND=false
         
         # 首先检查命令是否可用
@@ -232,6 +332,8 @@ jobs:
           
           if [ -f "$SDKMANAGER_PATH" ]; then
             echo "找到sdkmanager工具: $SDKMANAGER_PATH"
+            # 确保工具具有执行权限
+            chmod +x "$SDKMANAGER_PATH" 2>/dev/null || echo "无法设置sdkmanager工具的执行权限"
             # 将sdkmanager工具所在目录添加到PATH
             export PATH="$(dirname "$SDKMANAGER_PATH"):$PATH"
             echo "已将sdkmanager工具所在目录添加到PATH"
@@ -242,6 +344,8 @@ jobs:
             for path in "${COMMON_SDKMANAGER_PATHS[@]}"; do
               if [ -f "$path" ]; then
                 echo "找到sdkmanager工具: $path"
+                # 确保工具具有执行权限
+                chmod +x "$path" 2>/dev/null || echo "无法设置sdkmanager工具的执行权限"
                 export PATH="$(dirname "$path"):$PATH"
                 echo "已将sdkmanager工具所在目录添加到PATH"
                 SDKMANAGER_FOUND=true
@@ -272,38 +376,108 @@ jobs:
           export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
         fi
         
-        # 再次检查关键工具
-        echo "构建前再次检查关键工具..."
+        # 再次检查所有关键工具
+        echo "\n构建前再次检查关键工具..."
+        
+        # 定义关键工具列表
+        KEY_TOOLS=("sdkmanager" "aidl" "zipalign" "aapt")
         ALL_TOOLS_FOUND=true
         
-        for tool in sdkmanager aidl zipalign aapt; do
+        for tool in "${KEY_TOOLS[@]}"; do
           if command -v $tool &> /dev/null; then
             echo "✅ $tool工具已找到: $(command -v $tool)"
           else
             echo "❌ $tool工具未找到"
             ALL_TOOLS_FOUND=false
+            
             # 查找工具可能的位置
-            echo "正在查找$tool工具..."
-            find "$ANDROID_HOME" -name "$tool" -type f 2>/dev/null
+            echo "   正在查找$tool工具..."
+            TOOL_PATHS=$(find "$ANDROID_HOME" -name "$tool" -type f 2>/dev/null)
+            
+            if [ -n "$TOOL_PATHS" ]; then
+              echo "   找到$tool工具的位置:"
+              echo "$TOOL_PATHS"
+              
+              # 获取第一个找到的工具路径
+              FIRST_TOOL_PATH=$(echo "$TOOL_PATHS" | head -1)
+              TOOL_DIR=$(dirname "$FIRST_TOOL_PATH")
+              
+              # 确保工具具有执行权限
+              chmod +x "$FIRST_TOOL_PATH" 2>/dev/null || echo "   无法设置$tool工具的执行权限"
+              
+              # 将工具所在目录添加到PATH
+              export PATH="$TOOL_DIR:$PATH"
+              echo "   已将$tool工具所在目录($TOOL_DIR)添加到PATH"
+              
+              # 再次检查工具是否可用
+              if command -v $tool &> /dev/null; then
+                echo "   ✅ $tool工具现在可用: $(command -v $tool)"
+                ALL_TOOLS_FOUND=true
+              else
+                echo "   ❌ 即使添加到PATH，$tool工具仍然不可用"
+              fi
+            else
+              echo "   ❌ 未找到$tool工具"
+              
+              # 对于aidl工具，检查aidl3变体
+              if [ "$tool" = "aidl" ]; then
+                echo "   检查aidl3变体..."
+                AIDL3_PATHS=$(find "$ANDROID_HOME" -name "aidl3" -type f 2>/dev/null)
+                
+                if [ -n "$AIDL3_PATHS" ]; then
+                  echo "   找到aidl3工具的位置:"
+                  echo "$AIDL3_PATHS"
+                  
+                  # 获取第一个找到的aidl3工具路径
+                  FIRST_AIDL3_PATH=$(echo "$AIDL3_PATHS" | head -1)
+                  AIDL3_DIR=$(dirname "$FIRST_AIDL3_PATH")
+                  
+                  # 确保aidl3具有执行权限
+                  chmod +x "$FIRST_AIDL3_PATH" 2>/dev/null || echo "   无法设置aidl3工具的执行权限"
+                  
+                  # 创建aidl软链接
+                  ln -sf "$FIRST_AIDL3_PATH" "$AIDL3_DIR/aidl"
+                  echo "   已创建aidl软链接指向$FIRST_AIDL3_PATH"
+                  
+                  # 将工具所在目录添加到PATH
+                  export PATH="$AIDL3_DIR:$PATH"
+                  echo "   已将aidl3工具所在目录($AIDL3_DIR)添加到PATH"
+                  
+                  # 再次检查aidl工具是否可用
+                  if command -v aidl &> /dev/null; then
+                    echo "   ✅ aidl工具现在可用: $(command -v aidl)"
+                    ALL_TOOLS_FOUND=true
+                  fi
+                fi
+              fi
+            fi
           fi
         done
         
         # 如果有工具未找到，退出构建
         if ! $ALL_TOOLS_FOUND; then
-          echo "❌ 关键构建工具未找到，无法继续构建"
+          echo "\n❌ 关键构建工具未找到，无法继续构建"
           exit 1
         fi
         
-        echo "✅ 所有关键构建工具已找到，可以继续构建"
+        echo "\n✅ 所有关键构建工具已找到，可以继续构建"
         
         # 明确设置buildozer使用的环境变量
         echo "设置buildozer特定的环境变量..."
         export ANDROID_SDK_HOME="$ANDROID_HOME"
         export ANDROID_SDK_ROOT="$ANDROID_HOME"
-        export PATH="$PATH:$ANDROID_HOME/build-tools/34.0.0:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin"
+        
+        # 将所有build-tools目录添加到PATH
+        for build_tool_version in $(ls -1 "$ANDROID_HOME/build-tools/" 2>/dev/null || echo ""); do
+          export PATH="$PATH:$ANDROID_HOME/build-tools/$build_tool_version"
+        done
+        
+        export PATH="$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin"
+        
+        echo "最终PATH: $PATH"
         
         # 显示当前目录和文件
-        echo "当前目录内容:"
+        echo "\n当前目录内容:"
         ls -la
         
         # 设置详细日志级别以便更好地调试
@@ -311,7 +485,7 @@ jobs:
         export P4A_VERBOSE=1
         
         # 运行构建
-        echo "开始构建APK..."
+        echo "\n开始构建APK..."
         buildozer --verbose android debug
       env:
         # 设置构建环境变量
