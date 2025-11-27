@@ -184,8 +184,7 @@ jobs:
             echo "❌ $tool工具未找到"
             # 查找工具可能的位置
             echo "正在查找$tool工具..."
-            find "$ANDROID_HOME" -name "$tool" -type f
-            find ~/.buildozer/android/platform/android-sdk -name "$tool" -type f
+            find "$ANDROID_HOME" -name "$tool" -type f 2>/dev/null
           fi
         done
         
